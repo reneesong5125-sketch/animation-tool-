@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Lottie / XML 动效编辑台</title>
+<title>Yvette·动态图形编辑台</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2317181b'/%3E%3Cpath d='M9 10h6l-2 12h-6z' fill='%23d9a05b'/%3E%3Ccircle cx='21' cy='16' r='5' stroke='%23d9a05b' stroke-width='2.4' fill='none'/%3E%3C/svg%3E">
 <style>
 :root{
@@ -319,6 +319,13 @@ body{
 .fx-acts #fxRun{flex:1 1 auto;justify-content:center}
 .fx-acts #fxCancel{flex:0 0 auto}
 .fx-stat{font-size:10.5px;color:var(--text-dim);font-family:var(--mono);min-height:15px;word-break:break-all}
+/* ===== 单帧导出（进度条右侧） ===== */
+.single{display:flex;align-items:center;gap:5px;padding-left:9px;border-left:1px solid var(--line);flex:0 0 auto}
+.single .sk{font-size:10.5px;color:var(--muted);font-family:var(--mono);white-space:nowrap}
+.single button{height:24px;padding:0 9px;border-radius:5px;border:1px solid var(--line);background:var(--panel-2);color:#c9cfd7;font-family:var(--sans);font-size:11px;letter-spacing:.02em;cursor:pointer;transition:border-color .15s,color .15s,background .15s}
+.single button:hover:not(:disabled){border-color:#3a4049;color:var(--text);background:var(--panel-3)}
+.single button:disabled{opacity:.35;cursor:not-allowed}
+.single button.busy{opacity:.55;cursor:progress}
 
 </style>
 </head>
@@ -330,7 +337,7 @@ body{
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 8h4l-2 8H2z"/><path d="M20 8h-4l2 8h4z"/><circle cx="12" cy="12" r="2.6" fill="currentColor" stroke="none"/></svg>
     </div>
     <div>
-      <h1>Lottie / XML 动效编辑台</h1>
+      <h1>Yvette·动态图形编辑台</h1>
       <p>识别 · 预览 · 改尺寸 · 改颜色 · 换图 · 导出</p>
     </div>
   </div>
@@ -390,6 +397,7 @@ body{
         <span>· 鼠标移入舞台会虚线标出画布边界与尺寸；点色块立即弹出系统取色器。</span>
         <span>· 图片以 base64 内嵌进 JSON；引用外部路径的资源会提示。</span>
         <span>· GIF / WEBP 会识别格式、帧数与时长；动图按原尺寸导出保持逐帧。</span>
+        <span>· 拖入文件即自动播放；停在某一帧后，用进度条右侧的 SVG / PNG 导出这一张定帧（GIF / WEBP / XML 同样适用）。</span>
         <span>· 全部在本机处理，不上传。</span>
       </div>
     </div>
@@ -420,6 +428,11 @@ body{
       </button>
       <span class="tc" id="tcBox" style="display:none"><b id="curTime">0.00</b> / <span id="durTime">0.00</span>s</span>
       <input type="range" class="timeline" id="timeline" min="0" max="100" value="0" step="1" style="display:none" aria-label="时间轴">
+      <div class="single" id="singleExport" style="display:none">
+        <span class="sk">单帧</span>
+        <button type="button" id="btnFrameSvg" title="把当前停留的这一帧导出为 SVG 矢量">SVG</button>
+        <button type="button" id="btnFramePng" title="把当前停留的这一帧导出为 PNG 位图">PNG</button>
+      </div>
       <span class="stc" id="frameBox" style="display:none">帧 <b id="curFrame">0</b> / <span id="totalFrame">0</span></span>
       <span class="stc" id="fpsBox" style="display:none">· <b id="fpsLabel">0</b> fps</span>
       <span class="stc" id="dimBox" style="display:none">尺寸 <b id="dimLabel">—</b></span>
@@ -651,7 +664,10 @@ const el = {
   exportNote: $('#exportNote'),
   btnExport: $('#btnExport'),
   btnExport2: $('#btnExport2'),
-  btnCopy: $('#btnCopy')
+  btnCopy: $('#btnCopy'),
+  single: $('#singleExport'),
+  frameSvg: $('#btnFrameSvg'),
+  framePng: $('#btnFramePng')
 };
 
 const ICON_PLAY = '<path d="M7 4.5 19 12 7 19.5z" fill="currentColor" stroke="none"/>';
@@ -1152,6 +1168,7 @@ function rebuildXml(){
   let svgText;
   if (X.kind === 'vector') svgText = androidToSvg(dom, X.w, X.h);
   else svgText = out;
+  X.svgText = svgText;   // 单帧 SVG 导出直接复用这份矢量
 
   if (X.url) URL.revokeObjectURL(X.url);
   X.url = URL.createObjectURL(new Blob([svgText], { type: 'image/svg+xml' }));
@@ -1371,6 +1388,7 @@ function showView(type){
   renderDocbar();
   renderSwatches();
   if (window.__fxSync) window.__fxSync();
+  if (window.__frameSync) window.__frameSync();
 }
 
 /* ================= 舞台画布虚线框 ================= */
@@ -1698,6 +1716,7 @@ function updateExports(){
   el.btnExport2.disabled = !ready;
   el.btnCopy.disabled = !(ready && S.view !== 'image');
   if (window.__fxSync) window.__fxSync();
+  if (window.__frameSync) window.__frameSync();
 }
 
 function download(blob, name){
@@ -2251,6 +2270,7 @@ function syncFrameExportUI(){
     fxEl.run.disabled = !ready || FX.busy;
   }
   if (fxEl.cancel) fxEl.cancel.style.display = FX.busy ? '' : 'none';
+  if (window.__frameSync) window.__frameSync();
   fxNote();
 }
 
@@ -2837,6 +2857,211 @@ if (fxEl.cancel) fxEl.cancel.addEventListener('click', () => { FX.cancel = true;
 
 window.__fxSync = syncFrameExportUI;
 syncFrameExportUI();
+
+/* ============================================================
+   单帧导出（新增）：把当前停留的这一帧导出为 SVG / PNG
+   支持 Lottie / SVG / Android Vector / PNG / JPG / GIF / WEBP / APNG
+   只读取现有舞台渲染结果（复用画布渲染工具），不改动原有导出流程
+   ============================================================ */
+const FRAME = { busy: false };
+
+function frameViewReady(){
+  if (S.view === 'lottie') return !!(S.lottie && S.lottie.work && S.lottie.anim);
+  if (S.view === 'xml') return !!(S.xml && (S.xml.svgText || S.xml.text));
+  if (S.view === 'image') return !!S.images[S.activeImage];
+  return false;
+}
+
+function frameBaseName(){
+  if (S.view === 'lottie' && S.lottie) return baseName(S.lottie.name);
+  if (S.view === 'xml' && S.xml) return baseName(S.xml.name);
+  if (S.view === 'image' && S.images[S.activeImage]) return baseName(S.images[S.activeImage].name);
+  return 'frame';
+}
+
+function frameDims(){
+  if (S.view === 'lottie' && S.lottie) return [S.lottie.w, S.lottie.h];
+  if (S.view === 'xml' && S.xml) return [S.xml.w, S.xml.h];
+  const im = S.images[S.activeImage];
+  if (im) {
+    const f = S.imageScale || 1;
+    return [Math.round(im.w * f), Math.round(im.h * f)];
+  }
+  return [1, 1];
+}
+
+/* 播放中先停住，保证导出的是眼前这一帧 */
+function framePause(){
+  if (S.view !== 'lottie' || !S.lottie || !S.lottie.anim || !S.playing) return;
+  try { S.lottie.anim.pause(); } catch (e) {}
+  S.playing = false;
+  setPlayIcon();
+}
+
+function frameIndex(){
+  if (S.view !== 'lottie' || !S.lottie || !S.lottie.anim) return 0;
+  return Math.max(0, Math.round(S.lottie.anim.currentFrame || 0));
+}
+
+/* Lottie：克隆舞台里的这份 SVG，就是当前帧的矢量 */
+function lottieFrameSvg(){
+  const svg = el.animOut && el.animOut.querySelector('svg');
+  if (!svg) return null;
+  const [w, h] = frameDims();
+  const clone = svg.cloneNode(true);
+  clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+  clone.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
+  clone.setAttribute('width', w);
+  clone.setAttribute('height', h);
+  clone.setAttribute('viewBox', '0 0 ' + w + ' ' + h);
+  clone.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+  clone.removeAttribute('style');
+  clone.removeAttribute('class');
+  return '<?xml version="1.0" encoding="UTF-8"?>\n' + new XMLSerializer().serializeToString(clone);
+}
+
+/* Lottie：用离屏 canvas 渲染同一帧，PNG 结果与画布预览一致 */
+async function lottieFrameCanvas(){
+  const L = S.lottie;
+  const [w, h] = frameDims();
+  const renderer = await fxOpenCanvasAnim(L.work, w, h);
+  try {
+    const canvas = fxMakeCanvas(w, h);
+    fxDrawFrame(renderer, canvas, frameIndex(), 'transparent');
+    return canvas;
+  } finally {
+    fxCloseAnim(renderer);
+  }
+}
+
+/* 矢量 SVG 栅格化（Android Vector 也先转成了 SVG） */
+function rasterizeSvg(svgText, w, h){
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(new Blob([svgText], { type: 'image/svg+xml' }));
+    const img = new Image();
+    img.onload = () => {
+      const cv = fxMakeCanvas(Math.max(1, w), Math.max(1, h));
+      const ctx = cv.getContext('2d');
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(img, 0, 0, cv.width, cv.height);
+      URL.revokeObjectURL(url);
+      resolve(cv);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('SVG 栅格化失败')); };
+    img.src = url;
+  });
+}
+
+/* 图片（含 GIF / WEBP 动图）：抓当前显示帧；动图顺手定格，反复导出拿到的仍是这一帧 */
+async function frameSnapshotImage(){
+  const im = S.images[S.activeImage];
+  if (!im) throw new Error('没有可导出的图片');
+  const [w0, h0] = frameDims();
+  const w = Math.max(1, w0), h = Math.max(1, h0);
+  const paint = src => {
+    const cv = fxMakeCanvas(w, h);
+    const ctx = cv.getContext('2d');
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(src, 0, 0, w, h);
+    return cv;
+  };
+  const live = el.imgOut;
+  if (live && live.complete && live.naturalWidth) {
+    const cv = paint(live);
+    if (im.meta && im.meta.animated) live.src = cv.toDataURL('image/png');
+    return cv;
+  }
+  const src = await new Promise((res, rej) => {
+    const i = new Image();
+    i.onload = () => res(i);
+    i.onerror = () => rej(new Error('图片解码失败'));
+    i.src = im.url;
+  });
+  return paint(src);
+}
+
+function frameSvgWrapRaster(cv){
+  const w = cv.width, h = cv.height;
+  const href = cv.toDataURL('image/png');
+  return '<?xml version="1.0" encoding="UTF-8"?>\n'
+    + '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '">'
+    + '<image x="0" y="0" width="' + w + '" height="' + h + '" preserveAspectRatio="xMidYMid meet" href="' + href + '" xlink:href="' + href + '"/>'
+    + '</svg>';
+}
+
+async function exportFrame(kind){
+  if (!frameViewReady() || FRAME.busy) return;
+  FRAME.busy = true;
+  syncFrameUI();
+  framePause();
+
+  const [w, h] = frameDims();
+  const name = frameBaseName();
+
+  try {
+    if (S.view === 'lottie') {
+      const idx = frameIndex();
+      if (kind === 'svg') {
+        const text = lottieFrameSvg();
+        if (!text) throw new Error('舞台里还没有可导出的 SVG');
+        download(new Blob([text], { type: 'image/svg+xml' }), name + '_frame_' + idx + '.svg');
+        toast('已导出第 ' + idx + ' 帧 SVG（' + w + '×' + h + ' 矢量）');
+      } else {
+        const cv = await lottieFrameCanvas();
+        const blob = await fxCanvasBlob(cv, 'image/png');
+        if (!blob) throw new Error('PNG 编码失败');
+        download(blob, name + '_frame_' + idx + '.png');
+        toast('已导出第 ' + idx + ' 帧 PNG（' + cv.width + '×' + cv.height + '）');
+      }
+    } else if (S.view === 'xml') {
+      const svgText = S.xml.svgText || S.xml.text;
+      if (kind === 'svg') {
+        download(new Blob([svgText], { type: 'image/svg+xml' }), name + '_frame.svg');
+        toast('已导出 SVG 矢量（' + w + '×' + h + '）');
+      } else {
+        const cv = await rasterizeSvg(svgText, w, h);
+        const blob = await fxCanvasBlob(cv, 'image/png');
+        if (!blob) throw new Error('PNG 编码失败');
+        download(blob, name + '_frame.png');
+        toast('已导出 PNG（' + w + '×' + h + '）');
+      }
+    } else {
+      const im = S.images[S.activeImage];
+      const animated = !!(im.meta && im.meta.animated);
+      const cv = await frameSnapshotImage();
+      if (kind === 'svg') {
+        download(new Blob([frameSvgWrapRaster(cv)], { type: 'image/svg+xml' }), name + '_frame.svg');
+        toast('已导出当前帧 SVG（' + cv.width + '×' + cv.height + ' · 位图内嵌）');
+      } else {
+        const blob = await fxCanvasBlob(cv, 'image/png');
+        if (!blob) throw new Error('PNG 编码失败');
+        download(blob, name + '_frame.png');
+        toast('已导出当前帧 PNG（' + cv.width + '×' + cv.height + '）' + (animated ? ' · 动图已定格此帧，点缩略图可恢复播放' : ''));
+      }
+    }
+  } catch (err) {
+    toast('单帧导出失败：' + String((err && err.message) || err).slice(0, 60));
+  } finally {
+    FRAME.busy = false;
+    syncFrameUI();
+  }
+}
+
+function syncFrameUI(){
+  if (!el.single) return;
+  const ready = frameViewReady();
+  el.single.style.display = S.view ? '' : 'none';
+  [el.frameSvg, el.framePng].forEach(b => {
+    if (!b) return;
+    b.disabled = !ready || FRAME.busy || FX.busy;
+    b.classList.toggle('busy', FRAME.busy);
+  });
+}
+
+if (el.frameSvg) el.frameSvg.addEventListener('click', () => exportFrame('svg'));
+if (el.framePng) el.framePng.addEventListener('click', () => exportFrame('png'));
+window.__frameSync = syncFrameUI;
+syncFrameUI();
 
 /* ================= 首屏 ================= */
 if (typeof lottie === 'undefined') {
