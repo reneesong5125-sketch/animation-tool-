@@ -135,6 +135,7 @@ body{
 #animOut svg{display:block;width:100%!important;height:100%!important}
 #svgOut{display:none;max-width:100%;max-height:100%;object-fit:contain}
 #imgOut{display:none;max-width:100%;max-height:100%;object-fit:contain}
+#videoOut{display:none;max-width:100%;max-height:100%;object-fit:contain;background:#000}
 .emptyStage{
   position:absolute;inset:16px;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;
   gap:8px;color:var(--muted);text-align:center;padding:16px;pointer-events:none;
@@ -375,6 +376,18 @@ body{
       <input type="file" id="fileXml" accept=".xml,.svg,image/svg+xml,text/xml">
     </div>
 
+    <div class="zone" id="zoneVideo">
+      <div class="zone-head">
+        <div class="zone-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M8 5v14M16 5v14M3 9h18M3 15h18"/></svg></div>
+        <div>
+          <div class="zone-title">视频素材</div>
+          <div class="zone-ext">.mp4 / .mov / .webm</div>
+        </div>
+      </div>
+      <div class="zone-body"><span class="hintline">拖入视频，可导出单帧 JPG 或转成 GIF</span></div>
+      <input type="file" id="fileVideo" accept="video/mp4,video/quicktime,video/webm,.mp4,.mov,.m4v,.webm">
+    </div>
+
     <div class="zone" id="zoneImg">
       <div class="zone-head">
         <div class="zone-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5" r="1.6"/><path d="M4 17l5-5 4 4 3-2 4 4"/></svg></div>
@@ -397,6 +410,7 @@ body{
         <span>· 鼠标移入舞台会虚线标出画布边界与尺寸；点色块立即弹出系统取色器。</span>
         <span>· 图片以 base64 内嵌进 JSON；引用外部路径的资源会提示。</span>
         <span>· GIF / WEBP 会识别格式、帧数与时长；动图按原尺寸导出保持逐帧。</span>
+        <span>· 视频（MP4 / MOV / WEBM）可播放、拖时间轴，用「尺寸倍率」决定导出尺寸，再导出单帧 JPG 或转成 GIF。</span>
         <span>· 拖入文件即自动播放；停在某一帧后，用进度条右侧的 SVG / PNG 导出这一张定帧（GIF / WEBP / XML 同样适用）。</span>
         <span>· 全部在本机处理，不上传。</span>
       </div>
@@ -413,12 +427,12 @@ body{
         <div id="animOut"></div>
         <img id="svgOut" alt="矢量预览">
         <img id="imgOut" alt="图片预览">
-      </div>
+        <video id="videoOut" playsinline muted loop aria-label="视频预览"></video>
       <div class="guide" id="canvasGuide" aria-hidden="true"><span class="glabel" id="guideLabel"></span></div>
       <div class="emptyStage" id="emptyStage">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 8v8m-4-4 4 4 4-4"/></svg>
         <strong>等待导入</strong>
-        <small>左侧三个选区分别接受 Lottie JSON、矢量 XML 与图片；也可以直接把文件拖进舞台。</small>
+        <small>左侧选区分别接受 Lottie JSON、矢量 XML、视频与图片；也可以直接把文件拖进舞台。</small>
       </div>
     </section>
 
@@ -432,6 +446,7 @@ body{
         <span class="sk">单帧</span>
         <button type="button" id="btnFrameSvg" title="把当前停留的这一帧导出为 SVG 矢量">SVG</button>
         <button type="button" id="btnFramePng" title="把当前停留的这一帧导出为 PNG 位图">PNG</button>
+        <button type="button" id="btnFrameJpg" title="把当前停留的这一帧导出为 JPG 图片（无透明通道）">JPG</button>
       </div>
       <span class="stc" id="frameBox" style="display:none">帧 <b id="curFrame">0</b> / <span id="totalFrame">0</span></span>
       <span class="stc" id="fpsBox" style="display:none">· <b id="fpsLabel">0</b> fps</span>
@@ -494,6 +509,31 @@ body{
     <div class="card" id="secAssets" style="display:none">
       <h2>图片资源</h2>
       <div class="assets" id="assets"></div>
+    </div>
+
+    <div class="card" id="secVideo" style="display:none">
+      <h2>视频导出</h2>
+      <div class="fx-opts">
+        <div class="fx-row">
+          <span class="fx-k">帧率</span>
+          <input class="fx-num" id="vidFps" type="number" min="2" max="30" step="1" value="24" aria-label="视频转 GIF 帧率"><em class="fx-unit">fps</em>
+          <span class="fx-k" style="min-width:0;margin-left:auto;padding-left:6px">循环</span>
+          <div class="fx-seg" id="vidLoop" style="flex:0 0 104px">
+            <button type="button" data-loop="0" class="on">无限</button>
+            <button type="button" data-loop="1">1 次</button>
+            <button type="button" data-loop="2">2 次</button>
+          </div>
+        </div>
+        <div class="fx-note" id="vidNote">—</div>
+        <div class="fx-prog" id="vidProg" style="display:none"><i id="vidFill"></i></div>
+        <div class="fx-acts">
+          <button type="button" class="btn" id="vidJpg">导出当前帧 JPG</button>
+          <button type="button" class="btn primary" id="vidGif">转成 GIF</button>
+          <button type="button" class="btn" id="vidCancel" style="display:none">取消</button>
+        </div>
+        <div class="fx-stat" id="vidStat"></div>
+      </div>
+      <div class="scale-note">导出尺寸由上方的「尺寸倍率」决定，JPG 与 GIF 都按该尺寸渲染。</div>
     </div>
 
     <div class="card" id="secExport">
@@ -612,9 +652,10 @@ function toast(msg){
 
 /* ================= 状态 ================= */
 const S = {
-  view: null,            // lottie | xml | image
+  view: null,            // lottie | xml | image | video
   lottie: null,
   xml: null,
+  video: null,
   images: [],
   activeImage: null,
   imageScale: 1,
@@ -667,7 +708,8 @@ const el = {
   btnCopy: $('#btnCopy'),
   single: $('#singleExport'),
   frameSvg: $('#btnFrameSvg'),
-  framePng: $('#btnFramePng')
+  framePng: $('#btnFramePng'),
+  frameJpg: $('#btnFrameJpg')
 };
 
 const ICON_PLAY = '<path d="M7 4.5 19 12 7 19.5z" fill="currentColor" stroke="none"/>';
@@ -1374,19 +1416,41 @@ function showView(type){
   el.animOut.style.display = type === 'lottie' ? 'block' : 'none';
   el.svgOut.style.display = type === 'xml' ? 'block' : 'none';
   el.imgOut.style.display = type === 'image' ? 'block' : 'none';
+  const vid = videoNode();
+  if (vid) vid.style.display = type === 'video' ? 'block' : 'none';
   el.emptyStage.style.display = type ? 'none' : 'flex';
 
   const isLottie = type === 'lottie';
-  el.playBtn.style.display = isLottie ? 'grid' : 'none';
-  el.tcBox.style.display = isLottie ? '' : 'none';
-  el.timeline.style.display = isLottie ? '' : 'none';
-  el.frameBox.style.display = isLottie ? '' : 'none';
-  el.fpsBox.style.display = isLottie ? '' : 'none';
+  const isVideo = type === 'video';
+  el.playBtn.style.display = (isLottie || isVideo) ? 'grid' : 'none';
+  el.tcBox.style.display = (isLottie || isVideo) ? '' : 'none';
+  el.timeline.style.display = (isLottie || isVideo) ? '' : 'none';
+  el.frameBox.style.display = (isLottie || isVideo) ? '' : 'none';
+  el.fpsBox.style.display = (isLottie || isVideo) ? '' : 'none';
   el.dimBox.style.display = (type && !isLottie) ? '' : 'none';
+
+  if (isLottie) el.timeline.step = '1';
+  if (isVideo && vid) {
+    el.timeline.step = '0.01';
+    el.timeline.min = 0;
+    el.timeline.max = Math.max(0.01, (S.video && S.video.dur) || 1);
+    if (S.video && S.video.ready) fitContent(S.video.w, S.video.h, vid);
+    if (S.playing && vid.paused) { try { vid.play(); } catch (e) {} }
+    updateVideoSpecs();
+    syncVideoBar();
+  } else if (vid && !vid.paused) {
+    try { vid.pause(); } catch (e) {}
+  }
+
+  const secExp = document.getElementById('secExport');
+  const secVideo = document.getElementById('secVideo');
+  if (secExp) secExp.style.display = isVideo ? 'none' : '';
+  if (secVideo) secVideo.style.display = isVideo ? '' : 'none';
 
   el.secAssets.style.display = (isLottie && S.lottie && listImageAssets(S.lottie.baseData).length) ? '' : 'none';
   renderDocbar();
   renderSwatches();
+  if (isVideo) syncVideoExportUI();
   if (window.__fxSync) window.__fxSync();
   if (window.__frameSync) window.__frameSync();
 }
@@ -1396,11 +1460,16 @@ function stageNode(){
   if (S.view === 'lottie') return el.animOut;
   if (S.view === 'xml') return el.svgOut;
   if (S.view === 'image') return el.imgOut;
+  if (S.view === 'video') return videoNode();
   return null;
 }
 function canvasSizeNow(){
   if (S.view === 'lottie' && S.lottie) return [S.lottie.w, S.lottie.h];
   if (S.view === 'xml' && S.xml) return [S.xml.w, S.xml.h];
+  if (S.view === 'video' && S.video) {
+    const f = S.video.scaleF || 1;
+    return [Math.round((S.video.w || 0) * f), Math.round((S.video.h || 0) * f)];
+  }
   if (S.view === 'image' && S.images[S.activeImage]) {
     const im = S.images[S.activeImage], f = S.imageScale || 1;
     return [Math.round(im.w * f), Math.round(im.h * f)];
@@ -1458,6 +1527,7 @@ function updateScaleUI(){
   let f = 1, base = null, note = '';
   if (S.view === 'lottie' && S.lottie) { f = S.lottie.scaleF; base = S.lottie.baseData; }
   else if (S.view === 'xml' && S.xml) { f = S.xml.scaleF; }
+  else if (S.view === 'video' && S.video) { f = S.video.scaleF || 1; }
   else if (S.view === 'image' && S.images[S.activeImage]) { f = S.imageScale || 1; }
 
   document.querySelectorAll('#scalePills .pill').forEach(b => {
@@ -1469,6 +1539,9 @@ function updateScaleUI(){
     note = '原始 ' + (Number(base.w) || 400) + ' × ' + (Number(base.h) || 400) + ' → 当前 ' + S.lottie.w + ' × ' + S.lottie.h + '（' + f + '×）';
   } else if (S.view === 'xml' && S.xml) {
     note = '当前输出尺寸 ' + S.xml.w + ' × ' + S.xml.h + '（' + f + '×）';
+  } else if (S.view === 'video' && S.video) {
+    const V = S.video;
+    note = '原始 ' + V.w + ' × ' + V.h + ' → 导出 ' + Math.round((V.w || 0) * f) + ' × ' + Math.round((V.h || 0) * f) + '（' + f + '×）';
   } else if (S.view === 'image' && S.images[S.activeImage]) {
     const im = S.images[S.activeImage];
     note = '原始 ' + im.w + ' × ' + im.h + ' → 导出 ' + Math.round(im.w * f) + ' × ' + Math.round(im.h * f);
@@ -1486,6 +1559,7 @@ function baseDims(){
     return [Number(d.w) || S.lottie.w, Number(d.h) || S.lottie.h];
   }
   if (S.view === 'xml' && S.xml) return [S.xml.baseW || S.xml.w, S.xml.baseH || S.xml.h];
+  if (S.view === 'video' && S.video) return [S.video.w || 1, S.video.h || 1];
   if (S.view === 'image' && S.images[S.activeImage]) {
     const im = S.images[S.activeImage];
     return [im.w, im.h];
@@ -1496,6 +1570,10 @@ function baseDims(){
 function currentDims(){
   if (S.view === 'lottie' && S.lottie) return [Math.round(S.lottie.w), Math.round(S.lottie.h)];
   if (S.view === 'xml' && S.xml) return [Math.round(S.xml.w), Math.round(S.xml.h)];
+  if (S.view === 'video' && S.video) {
+    const f = S.video.scaleF || 1;
+    return [Math.round((S.video.w || 0) * f), Math.round((S.video.h || 0) * f)];
+  }
   if (S.view === 'image' && S.images[S.activeImage]) {
     const im = S.images[S.activeImage], f = S.imageScale || 1;
     return [Math.round(im.w * f), Math.round(im.h * f)];
@@ -1512,15 +1590,17 @@ function syncWHFields(){
   if (cur) { el.wInput.value = cur[0]; el.hInput.value = cur[1]; }
 }
 
+function scaleMin(){ return (S.view === 'video') ? 0.02 : 0.1; }
+
 function applyWHTarget(){
   const b = baseDims();
   if (!b || !b[0] || !b[1]) { toast('先载入文件再设置宽高'); return; }
   const w = Number(el.wInput.value), h = Number(el.hInput.value);
   if (!isFinite(w) || w <= 0 || !isFinite(h) || h <= 0) { toast('宽高需大于 0'); return; }
   const f = w / b[0];
-  const limited = Math.min(10, Math.max(0.1, f));
+  const limited = Math.min(10, Math.max(scaleMin(), f));
   setScale(limited);
-  if (limited !== f) toast('已限制在 0.1×–10× 范围');
+  if (limited !== f) toast('已限制在 ' + scaleMin() + '×–10× 范围');
   const cur = currentDims();
   if (cur) toast('已应用 ' + cur[0] + ' × ' + cur[1] + ' px');
 }
@@ -1528,11 +1608,17 @@ function applyWHTarget(){
 function setScale(f){
   f = Number(f);
   if (!isFinite(f) || f <= 0) { toast('倍率需大于 0'); return; }
-  f = Math.min(10, Math.max(0.1, f));
+  f = Math.min(10, Math.max(scaleMin(), f));
   if (S.view === 'lottie' && S.lottie) {
     S.lottie.scaleF = f; rebuildLottie(true);
   } else if (S.view === 'xml' && S.xml) {
     S.xml.scaleF = f; rebuildXml();
+  } else if (S.view === 'video' && S.video) {
+    S.video.scaleF = f;
+    updateVideoSpecs(); updateScaleUI();
+    const v = videoNode();
+    if (v && S.video.ready) fitContent(S.video.w, S.video.h, v);
+    syncVideoExportUI();
   } else if (S.view === 'image') {
     S.imageScale = f; updateImageSpecs(); updateScaleUI();
     const im = S.images[S.activeImage];
@@ -1545,6 +1631,7 @@ function setScale(f){
 function activeColors(){
   if (S.view === 'lottie' && S.lottie) return { map: S.lottie.colors, colorMap: S.lottie.colorMap, kind: 'lottie' };
   if (S.view === 'xml' && S.xml) return { map: S.xml.colors, colorMap: S.xml.colorMap, kind: 'xml' };
+  if (S.view === 'video') return { kind: 'video' };
   if (S.view === 'image') return { kind: 'image' };
   return null;
 }
@@ -1555,8 +1642,10 @@ function renderSwatches(){
     el.swatches.innerHTML = '<div class="hint">载入文件后列出可用颜色</div>';
     return;
   }
-  if (info.kind === 'image') {
-    el.swatches.innerHTML = '<div class="hint">图片为位图，不提供选色编辑；可在 Lottie / XML 视图中改矢量颜色。</div>';
+  if (info.kind === 'image' || info.kind === 'video') {
+    el.swatches.innerHTML = '<div class="hint">' + (info.kind === 'video'
+      ? '视频是位流，不提供选色编辑；可导出单帧 JPG 或转成 GIF。'
+      : '图片为位图，不提供选色编辑；可在 Lottie / XML 视图中改矢量颜色。') + '</div>';
     return;
   }
   const entries = Array.from(info.map.entries()).slice(0, 60);
@@ -1646,7 +1735,7 @@ function closeAssetModal(){ $('#assetModal').classList.remove('on'); }
 
 /* ================= 文档栏 ================= */
 function updateZoneStates(){
-  const zl = $('#zoneLottie'), zx = $('#zoneXml'), zi = $('#zoneImg');
+  const zl = $('#zoneLottie'), zx = $('#zoneXml'), zi = $('#zoneImg'), zv = $('#zoneVideo');
   if (!zl) return;
   zl.classList.toggle('filled', !!S.lottie);
   zx.classList.toggle('filled', !!S.xml);
@@ -1659,6 +1748,14 @@ function updateZoneStates(){
   zx.querySelector('.zone-body').innerHTML = S.xml
     ? `<div class="zone-file"><div><div class="fn">${escapeHtml(S.xml.name)}</div><div class="fs">${S.xml.kind === 'vector' ? 'Android Vector' : 'SVG'} · ${S.xml.w}×${S.xml.h}</div></div><button class="mini-x" data-clear="xml" title="移除">✕</button></div>`
     : '<span class="hintline">支持 SVG 与 Android Vector</span>';
+
+  if (zv) {
+    zv.classList.toggle('filled', !!S.video);
+    const V = S.video;
+    zv.querySelector('.zone-body').innerHTML = V
+      ? `<div class="zone-file"><div><div class="fn">${escapeHtml(V.name)}</div><div class="fs">${V.w || '?'}×${V.h || '?'} · ${(V.dur && isFinite(V.dur)) ? V.dur.toFixed(2) + 's' : '解析中'} · ${fmtBytes(V.bytes)}</div></div><button class="mini-x" data-clear="video" title="移除">✕</button></div>`
+      : '<span class="hintline">拖入视频，可导出单帧 JPG 或转成 GIF</span>';
+  }
 
   // 图片素材区：内嵌图（来自当前 Lottie）+ 独立导入图
   const embCount = S.lottie ? listImageAssets(S.lottie.baseData).length : 0;
@@ -1681,6 +1778,7 @@ function renderDocbar(){
   const chips = [];
   if (S.lottie) chips.push({ type: 'lottie', label: 'Lottie', name: S.lottie.name });
   if (S.xml) chips.push({ type: 'xml', label: S.xml.kind === 'vector' ? 'VECTOR' : 'SVG', name: S.xml.name });
+  if (S.video) chips.push({ type: 'video', label: 'VIDEO', name: S.video.name });
   S.images.forEach((im, i) => chips.push({ type: 'image', idx: i, label: 'IMG', name: im.name }));
 
   if (!chips.length) {
@@ -1710,11 +1808,17 @@ function updateExports(){
   const ready = !!(
     (S.view === 'lottie' && S.lottie && S.lottie.work) ||
     (S.view === 'xml' && S.xml && S.xml.text) ||
+    (S.view === 'video' && S.video && S.video.ready) ||
     (S.view === 'image' && S.images[S.activeImage])
   );
   el.btnExport.disabled = !ready;
-  el.btnExport2.disabled = !ready;
-  el.btnCopy.disabled = !(ready && S.view !== 'image');
+  el.btnExport2.disabled = !(
+    (S.view === 'lottie' && S.lottie && S.lottie.work) ||
+    (S.view === 'xml' && S.xml && S.xml.text) ||
+    (S.view === 'image' && S.images[S.activeImage])
+  );
+  el.btnCopy.disabled = !(ready && S.view !== 'image' && S.view !== 'video');
+  syncVideoExportUI();
   if (window.__fxSync) window.__fxSync();
   if (window.__frameSync) window.__frameSync();
 }
@@ -1781,6 +1885,8 @@ function exportCurrent(){
     const ext = S.xml.kind === 'vector' ? '.xml' : '.svg';
     download(new Blob([S.xml.text], { type: 'application/xml' }), baseName(S.xml.name) + '_edited' + ext);
     toast('已导出编辑后的 ' + ext.slice(1).toUpperCase());
+  } else if (S.view === 'video' && S.video && S.video.ready) {
+    exportVideoJpg();
   } else if (S.view === 'image' && S.images[S.activeImage]) {
     exportImage();
   } else {
@@ -1831,16 +1937,18 @@ function exportImage(){
 function routeFiles(files){
   const list = Array.from(files || []);
   if (!list.length) return;
-  const lottieFiles = [], xmlFiles = [], imgFiles = [];
+  const lottieFiles = [], xmlFiles = [], imgFiles = [], videoFiles = [];
   list.forEach(f => {
     const ext = extOf(f.name);
     if (ext === 'json' || f.type === 'application/json') lottieFiles.push(f);
     else if (ext === 'xml' || ext === 'svg' || /xml|svg/.test(f.type)) xmlFiles.push(f);
+    else if (ext === 'mp4' || ext === 'mov' || ext === 'm4v' || ext === 'webm' || /^video\//.test(f.type)) videoFiles.push(f);
     else if (/^image\//.test(f.type)) imgFiles.push(f);
     else toast('暂不支持的文件类型：' + f.name);
   });
   if (lottieFiles.length) readTextFile(lottieFiles[0], (text, size) => loadLottie(text, lottieFiles[0].name, size));
   if (xmlFiles.length) readTextFile(xmlFiles[0], (text, size) => loadXml(text, xmlFiles[0].name, size));
+  if (videoFiles.length) loadVideoFile(videoFiles[0]);
   if (imgFiles.length) addImages(imgFiles);
 }
 
@@ -1853,8 +1961,9 @@ function readTextFile(file, cb){
 
 /* ================= 交互绑定 ================= */
 // 选区内点击
-[['#zoneLottie', '#fileLottie'], ['#zoneXml', '#fileXml'], ['#zoneImg', '#fileImg']].forEach(([zone, input]) => {
+[['#zoneLottie', '#fileLottie'], ['#zoneXml', '#fileXml'], ['#zoneVideo', '#fileVideo'], ['#zoneImg', '#fileImg']].forEach(([zone, input]) => {
   const z = $(zone), inp = $(input);
+  if (!z || !inp) return;
   z.addEventListener('click', e => {
     if (e.target.closest('.mini-x') || e.target.closest('.thumbs') || e.target.closest('.embed')) return;
     inp.click();
@@ -1866,6 +1975,8 @@ function readTextFile(file, cb){
       if (first) readTextFile(first, (t, s) => loadLottie(t, first.name, s));
     } else if (input === '#fileXml') {
       if (first) readTextFile(first, (t, s) => loadXml(t, first.name, s));
+    } else if (input === '#fileVideo') {
+      if (first) loadVideoFile(first);
     } else {
       addImages(Array.from(files || []));
     }
@@ -1971,7 +2082,7 @@ el.swatches.addEventListener('click', e => {
 });
 $('#colorReset').addEventListener('click', () => {
   const info = activeColors();
-  if (!info || info.kind === 'image') { toast('当前没有可还原的颜色'); return; }
+  if (!info || !info.colorMap) { toast('当前没有可还原的颜色'); return; }
   info.colorMap = {};
   if (info.kind === 'lottie') rebuildLottie(true); else rebuildXml();
   renderSwatches();
@@ -2048,6 +2159,11 @@ function removeDoc(type, idx){
     if (S.xml && S.xml.url) URL.revokeObjectURL(S.xml.url);
     S.xml = null;
     el.svgOut.removeAttribute('src');
+  } else if (type === 'video') {
+    const v = videoNode();
+    if (v) { try { v.pause(); } catch (e) {} v.removeAttribute('src'); try { v.load(); } catch (e) {} }
+    if (S.video && S.video.url) { try { URL.revokeObjectURL(S.video.url); } catch (e) {} }
+    S.video = null;
   } else if (type === 'image') {
     S.images.splice(idx, 1);
   }
@@ -2069,12 +2185,14 @@ el.docbar.addEventListener('click', e => {
   const type = chip.dataset.view;
   if (type === 'lottie' && S.lottie) { showView('lottie'); updateLottieSpecs(); updateScaleUI(); renderSwatches(); fitContent(S.lottie.w, S.lottie.h, el.animOut); }
   else if (type === 'xml' && S.xml) { showView('xml'); rebuildXml(); renderSwatches(); }
+  else if (type === 'video' && S.video) { showView('video'); updateVideoSpecs(); updateScaleUI(); renderSwatches(); syncVideoExportUI(); if (S.video.ready) fitContent(S.video.w, S.video.h, videoNode()); }
   else if (type === 'image') { setActiveImage(Number(chip.dataset.idx)); }
 });
 
 function nextViewAfterClose(){
   if (S.lottie) { showView('lottie'); updateLottieSpecs(); fitContent(S.lottie.w, S.lottie.h, el.animOut); return; }
   if (S.xml) { showView('xml'); rebuildXml(); return; }
+  if (S.video && S.video.ready) { showView('video'); updateVideoSpecs(); fitContent(S.video.w, S.video.h, videoNode()); return; }
   if (S.images.length) { setActiveImage(0); return; }
   S.view = null;
   showView(null);
@@ -2115,6 +2233,14 @@ window.addEventListener('drop', e => { e.preventDefault(); routeFiles(e.dataTran
 
 // 播放控制
 el.playBtn.addEventListener('click', () => {
+  if (S.view === 'video') {
+    const v = videoNode();
+    if (!v || !S.video || !S.video.ready) return;
+    if (v.paused) { const p = v.play(); if (p && p.catch) p.catch(() => {}); S.playing = true; }
+    else { v.pause(); S.playing = false; }
+    setPlayIcon();
+    return;
+  }
   const L = S.lottie;
   if (!L || !L.anim) return;
   if (S.playing) { L.anim.pause(); S.playing = false; }
@@ -2123,6 +2249,14 @@ el.playBtn.addEventListener('click', () => {
 });
 
 el.timeline.addEventListener('input', () => {
+  if (S.view === 'video') {
+    const v = videoNode(), V = S.video;
+    if (!v || !V) return;
+    S.scrubbing = true;
+    v.currentTime = Math.min(Number(el.timeline.value) || 0, Math.max(0, (V.dur || 0) - 0.001));
+    syncVideoBar();
+    return;
+  }
   const L = S.lottie;
   if (!L || !L.anim) return;
   S.scrubbing = true;
@@ -2134,6 +2268,11 @@ el.timeline.addEventListener('input', () => {
   el.timeline.addEventListener(ev, () => {
     if (!S.scrubbing) return;
     S.scrubbing = false;
+    if (S.view === 'video') {
+      const v = videoNode();
+      if (S.playing && v && v.paused) { const p = v.play(); if (p && p.catch) p.catch(() => {}); }
+      return;
+    }
     if (S.playing && S.lottie && S.lottie.anim) S.lottie.anim.play();
   });
 });
@@ -2179,6 +2318,7 @@ window.addEventListener('resize', () => {
   rTimer = setTimeout(() => {
     if (S.view === 'lottie' && S.lottie) fitContent(S.lottie.w, S.lottie.h, el.animOut);
     else if (S.view === 'xml' && S.xml) fitContent(S.xml.w, S.xml.h, el.svgOut);
+    else if (S.view === 'video' && S.video) fitContent(S.video.w, S.video.h, videoNode());
     else if (S.view === 'image' && S.images[S.activeImage]) { const im = S.images[S.activeImage]; fitContent(im.w, im.h, el.imgOut); }
   }, 150);
 });
@@ -2625,9 +2765,9 @@ function fxDrawFrame(renderer, target, frame, bg){
   return target;
 }
 
-function fxCanvasBlob(canvas, type){
+function fxCanvasBlob(canvas, type, quality){
   return new Promise(resolve => {
-    if (canvas.toBlob) canvas.toBlob(resolve, type);
+    if (canvas.toBlob) canvas.toBlob(resolve, type, quality);
     else resolve(null);
   });
 }
@@ -2859,7 +2999,558 @@ window.__fxSync = syncFrameExportUI;
 syncFrameExportUI();
 
 /* ============================================================
-   单帧导出（新增）：把当前停留的这一帧导出为 SVG / PNG
+   视频（新增）：MP4 / MOV / WEBM 导入
+   预览 · 可编辑缩放 · 单帧 JPG · 转 GIF
+   复用现有 GIF 编码（FxBuf / LZW / 调色板）与画布工具，原有流程不动
+   ============================================================ */
+const VIDEO_FPS_FALLBACK = 24;
+
+function videoNode(){ return document.getElementById('videoOut'); }
+
+function mimeShort(t){
+  const s = String(t || '').toLowerCase();
+  if (/mp4/.test(s)) return 'MP4';
+  if (/quicktime|mov/.test(s)) return 'MOV';
+  if (/webm/.test(s)) return 'WEBM';
+  if (/m4v/.test(s)) return 'M4V';
+  return s ? s.replace(/^video\//, '').toUpperCase() : 'VIDEO';
+}
+
+function codecName(c){
+  const s = String(c || '').toLowerCase();
+  const map = { avc1: 'H.264', avc3: 'H.264', hvc1: 'H.265', hev1: 'H.265', av01: 'AV1', vp09: 'VP9', vp08: 'VP8', mp4v: 'MPEG-4' };
+  return map[s] || (c ? String(c).toUpperCase() : '');
+}
+
+function timeTag(t){
+  const s = Math.max(0, Number(t) || 0);
+  const mm = Math.floor(s / 60), ss = Math.floor(s % 60), cc = Math.floor((s - Math.floor(s)) * 100);
+  const p = n => String(n).padStart(2, '0');
+  return p(mm) + '-' + p(ss) + '-' + p(cc);
+}
+
+/* JPG 没有透明通道，先铺白底再画，避免发黑 */
+function jpegCanvas(src){
+  const cv = fxMakeCanvas(src.width, src.height);
+  const ctx = cv.getContext('2d');
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, cv.width, cv.height);
+  ctx.drawImage(src, 0, 0);
+  return cv;
+}
+
+async function saveRaster(cv, kind, filePrefix, label){
+  const isJpg = kind === 'jpg';
+  const target = isJpg ? jpegCanvas(cv) : cv;
+  const blob = await fxCanvasBlob(target, isJpg ? 'image/jpeg' : 'image/png', isJpg ? 0.92 : undefined);
+  if (!blob) throw new Error((isJpg ? 'JPG' : 'PNG') + ' 编码失败');
+  download(blob, filePrefix + (isJpg ? '.jpg' : '.png'));
+  toast('已导出 ' + label + '（' + target.width + '×' + target.height + '）');
+}
+
+/* MP4 / MOV 容器解析：取视频轨帧数、时长、真实帧率与编码名 */
+function probeMp4(buf){
+  try {
+    const b = new Uint8Array(buf);
+    const dv = new DataView(buf);
+    const u32 = o => dv.getUint32(o);
+    const ascii = (o, n) => { let s = ''; for (let i = 0; i < n; i++) s += String.fromCharCode(dv.getUint8(o + i)); return s; };
+    function boxes(start, end){
+      const out = [];
+      let p = start;
+      while (p + 8 <= end){
+        let size = u32(p);
+        const type = ascii(p + 4, 4);
+        if (size === 1){ size = Number(dv.getBigUint64(p + 8)); }
+        if (size === 0) size = end - p;
+        if (size < 8) break;
+        out.push({ type, body: p + 8, end: Math.min(end, p + size) });
+        p += size;
+      }
+      return out;
+    }
+    const find = (l, t) => l.find(x => x.type === t);
+    const top = boxes(0, b.length);
+    const moov = find(top, 'moov');
+    if (!moov) return null;
+    const inner = boxes(moov.body, moov.end);
+    let durSec = 0;
+    const mvhd = find(inner, 'mvhd');
+    if (mvhd){
+      const v = b[mvhd.body];
+      const ts = v === 1 ? u32(mvhd.body + 20) : u32(mvhd.body + 12);
+      const du = v === 1 ? Number(dv.getBigUint64(mvhd.body + 24)) : u32(mvhd.body + 16);
+      if (ts) durSec = du / ts;
+    }
+    for (const trak of inner.filter(x => x.type === 'trak')){
+      const ti = boxes(trak.body, trak.end);
+      const mdia = find(ti, 'mdia');
+      if (!mdia) continue;
+      const mi = boxes(mdia.body, mdia.end);
+      const mdhd = find(mi, 'mdhd');
+      const hdlr = find(mi, 'hdlr');
+      if (!mdhd || !hdlr) continue;
+      if (ascii(hdlr.body + 8, 4) !== 'vide') continue;
+      const v = b[mdhd.body];
+      const ts = v === 1 ? u32(mdhd.body + 20) : u32(mdhd.body + 12);
+      const du = v === 1 ? Number(dv.getBigUint64(mdhd.body + 24)) : u32(mdhd.body + 16);
+      const tkhd = find(ti, 'tkhd');
+      let w = 0, h = 0;
+      if (tkhd){
+        const off = b[tkhd.body] === 1 ? 88 : 76;
+        w = u32(tkhd.body + off) >>> 16;
+        h = u32(tkhd.body + off + 4) >>> 16;
+      }
+      let frames = 0, codec = '';
+      const minf = find(mi, 'minf');
+      if (minf){
+        const stbl = find(boxes(minf.body, minf.end), 'stbl');
+        if (stbl){
+          const sb = boxes(stbl.body, stbl.end);
+          const stsz = find(sb, 'stsz');
+          if (stsz) frames = u32(stsz.body + 8);
+          const stsd = find(sb, 'stsd');
+          if (stsd && u32(stsd.body + 4) >= 1) codec = ascii(stsd.body + 12, 4);
+        }
+      }
+      /* 分片 MP4（MediaRecorder 等）的样本数在 moof 的 trun 里，累加 sample_count */
+      if (!frames){
+        for (const mf of top){
+          if (mf.type !== 'moof') continue;
+          for (const traf of boxes(mf.body, mf.end)){
+            if (traf.type !== 'traf') continue;
+            for (const trun of boxes(traf.body, traf.end)){
+              if (trun.type === 'trun') frames += u32(trun.body + 4);
+            }
+          }
+        }
+      }
+      const dur = ts ? du / ts : durSec;
+      return { w, h, frames, dur, fps: (dur && frames) ? frames / dur : 0, codec };
+    }
+    return null;
+  } catch (e) { return null; }
+}
+
+/* 一部分录制视频（MediaRecorder / 无 duration 的 webm）会报 Infinity，
+   用 seekable 或「把 currentTime 顶到极大值」的办法问出真实时长 */
+function resolveDuration(v){
+  if (isFinite(v.duration) && v.duration > 0) return Promise.resolve(v.duration);
+  if (v.seekable && v.seekable.length){
+    const e = v.seekable.end(v.seekable.length - 1);
+    if (isFinite(e) && e > 0) return Promise.resolve(e);
+  }
+  return new Promise(resolve => {
+    let done = false;
+    const finish = d => {
+      if (done) return;
+      done = true;
+      v.removeEventListener('timeupdate', onTime);
+      clearTimeout(timer);
+      try { v.currentTime = 0; } catch (e) {}
+      resolve(isFinite(d) && d > 0 ? d : 0);
+    };
+    const onTime = () => finish(v.duration);
+    const timer = setTimeout(() => finish(v.duration), 2500);
+    v.addEventListener('timeupdate', onTime);
+    try { v.currentTime = 1e101; } catch (e) { finish(0); }
+  });
+}
+
+function loadVideoFile(file){
+  const v = videoNode();
+  if (!v) { toast('视频容器未就绪'); return; }
+  if (S.video && S.video.url) { try { URL.revokeObjectURL(S.video.url); } catch (e) {} }
+
+  const url = URL.createObjectURL(file);
+  const V = {
+    name: file.name, bytes: file.size, type: file.type || '',
+    url, w: 0, h: 0, dur: 0, fps: VIDEO_FPS_FALLBACK, frames: 0, codec: '', fpsExact: false,
+    scaleF: 1, ready: false
+  };
+  S.video = V;
+  S.view = 'video';
+  S.playing = true;
+  v.pause();
+  v.muted = true;
+  v.playsInline = true;
+  v.loop = true;
+  v.src = url;
+  v.load();
+  showView('video');
+  updateZoneStates();
+  renderDocbar();
+
+  let settled = false;
+  const fail = msg => {
+    if (settled) return;
+    settled = true;
+    if (S.video === V) S.video = null;
+    try { URL.revokeObjectURL(url); } catch (e) {}
+    nextViewAfterClose();
+    renderDocbar();
+    toast(msg);
+  };
+  v.onerror = () => fail('视频解码失败：浏览器不支持该编码（如 HEVC / ProRes），请先转成 H.264 的 MP4');
+
+  v.onloadedmetadata = async () => {
+    if (settled) return;
+    V.w = v.videoWidth || 0;
+    V.h = v.videoHeight || 0;
+    V.dur = await resolveDuration(v);
+    if (settled) return;
+
+    let info = null;
+    try { info = probeMp4(await file.arrayBuffer()); } catch (e) { info = null; }
+    if (info){
+      if (!V.w) V.w = info.w;
+      if (!V.h) V.h = info.h;
+      if (info.frames) V.frames = info.frames;
+      if (info.codec) V.codec = info.codec;
+      /* 帧率优先用「容器帧数 / 浏览器读到的时长」，避开分片 MP4 不足一帧的 mdhd 时长 */
+      if (info.frames && V.dur > 0){
+        const fr = info.frames / V.dur;
+        if (fr >= 1 && fr <= 120){
+          const snapped = Math.round(fr);
+          V.fps = (Math.abs(fr - snapped) < 0.6) ? snapped : (Math.round(fr * 100) / 100);
+          V.fpsExact = true;
+        }
+      } else if (info.fps > 1 && info.fps <= 120 && V.dur === 0){
+        V.fps = Math.round(info.fps * 100) / 100;
+      }
+    }
+    if (!isFinite(V.dur) || V.dur <= 0) V.dur = 0;
+    if (!V.frames) V.frames = Math.round((V.dur || 0) * V.fps);
+    V.fps = Math.max(2, V.fps || VIDEO_FPS_FALLBACK);
+    if (!V.w || !V.h) { fail('拿不到视频尺寸，可能不是有效的视频文件'); return; }
+
+    settled = true;
+    V.ready = true;
+    VIDX.fps = Math.max(2, Math.min(30, Math.round(V.fps)));
+    if (S.video !== V) return;
+
+    el.timeline.min = 0;
+    el.timeline.step = '0.01';
+    el.timeline.max = Math.max(0.01, (V.dur && isFinite(V.dur)) ? V.dur : 1);
+    el.timeline.value = 0;
+    if (S.view === 'video'){
+      fitContent(V.w, V.h, v);
+      updateVideoSpecs();
+      updateScaleUI();
+      syncVideoBar();
+    }
+    updateZoneStates();
+    renderDocbar();
+    updateExports();
+    syncVideoExportUI();
+    if (S.view === 'video' && S.playing && v.paused) { const p = v.play(); if (p && p.catch) p.catch(() => {}); }
+    toast('已识别视频 · ' + V.w + '×' + V.h + ' · ' + (isFinite(V.dur) ? V.dur : 0).toFixed(2) + 's · ' + (V.fpsExact ? V.fps + 'fps' : '≈' + Math.round(V.fps) + 'fps') + (V.codec ? ' · ' + codecName(V.codec) : ''));
+  };
+}
+
+function updateVideoSpecs(){
+  const V = S.video;
+  if (!V) return;
+  const f = V.scaleF || 1;
+  setSpec('name', V.name);
+  setSpec('type', '视频 · ' + mimeShort(V.type) + (V.codec ? ' · ' + codecName(V.codec) : ''));
+  const outW = Math.round((V.w || 0) * f), outH = Math.round((V.h || 0) * f);
+  setSpec('size', (V.w || '?') + ' × ' + (V.h || '?') + (f !== 1 ? ' → ' + outW + ' × ' + outH : ''));
+  el.dimLabel.textContent = outW + ' × ' + outH;
+  el.i.frWrap.style.display = 'none';
+  el.i.frStatic.style.display = '';
+  setSpec('frStatic', V.fpsExact ? V.fps + ' fps' : '≈' + (Math.round((V.fps || VIDEO_FPS_FALLBACK) * 10) / 10) + ' fps（估算）');
+  const total = V.frames || Math.round((V.dur || 0) * (V.fps || VIDEO_FPS_FALLBACK));
+  setSpec('frames', total + ' 帧 / ' + ((V.dur || 0) > 0 ? (V.dur).toFixed(2) + ' s' : '时长未知'));
+  setSpec('layers', '—');
+  setSpec('assets', '—');
+  setSpec('bytes', fmtBytes(V.bytes));
+}
+
+function syncVideoBar(){
+  const V = S.video, v = videoNode();
+  if (!V || !v || S.view !== 'video') return;
+  const t = isFinite(v.currentTime) ? v.currentTime : 0;
+  const dur = (V.dur && isFinite(V.dur)) ? V.dur : 0;
+  el.timeline.max = Math.max(0.01, dur || 1);
+  el.timeline.value = t;
+  el.curTime.textContent = t.toFixed(2);
+  el.durTime.textContent = dur.toFixed(2);
+  const fps = V.fps || VIDEO_FPS_FALLBACK;
+  const totalFr = (V.frames > 0) ? V.frames : (dur ? Math.round(dur * fps) : 0);
+  el.totalFrame.textContent = totalFr;
+  const curFr = Math.min(totalFr || 1e9, Math.round(t * fps));
+  el.curFrame.textContent = totalFr ? Math.max(0, Math.min(totalFr, curFr)) : Math.round(t * fps);
+  el.fpsLabel.textContent = V.fpsExact ? V.fps : '≈' + (Math.round(fps * 10) / 10);
+  el.dimLabel.textContent = Math.round((V.w || 0) * (V.scaleF || 1)) + ' × ' + Math.round((V.h || 0) * (V.scaleF || 1));
+}
+
+/* ---------- 视频导出的面板状态 ---------- */
+const VIDX = { busy: false, cancel: false, fps: 24, loop: 0 };
+
+const vidEl = {
+  fps: document.getElementById('vidFps'),
+  loop: document.getElementById('vidLoop'),
+  note: document.getElementById('vidNote'),
+  prog: document.getElementById('vidProg'),
+  fill: document.getElementById('vidFill'),
+  jpg: document.getElementById('vidJpg'),
+  gif: document.getElementById('vidGif'),
+  cancel: document.getElementById('vidCancel'),
+  stat: document.getElementById('vidStat')
+};
+
+function videoOutDims(){
+  const V = S.video;
+  if (!V) return { w: 1, h: 1 };
+  const f = V.scaleF || 1;
+  return {
+    w: Math.min(4096, Math.max(1, Math.round((V.w || 1) * f))),
+    h: Math.min(4096, Math.max(1, Math.round((V.h || 1) * f)))
+  };
+}
+
+function vidStatus(text, pct){
+  if (vidEl.stat) vidEl.stat.textContent = text || '';
+  if (vidEl.prog) vidEl.prog.style.display = (pct === null || pct === undefined) ? 'none' : '';
+  if (vidEl.fill && pct !== null && pct !== undefined) vidEl.fill.style.width = Math.max(0, Math.min(100, pct)) + '%';
+}
+
+/* GIF 帧数：按时长×帧率取样，但不超过容器里真实的帧数（避免尾帧重复） */
+function gifFrameCount(dur, fps){
+  const V = S.video;
+  const n = Math.max(1, Math.min(900, Math.round(dur * fps)));
+  if (V && V.frames > 0) return Math.max(1, Math.min(n, V.frames));
+  return n;
+}
+
+function syncVideoExportUI(){
+  if (!vidEl.fps) return;
+  const V = S.video;
+  const ready = !!(V && V.ready) && S.view === 'video';
+  const size = videoOutDims();
+  const fps = Math.max(2, Math.min(30, Math.round(Number(VIDX.fps) || 24)));
+  const dur = (V && isFinite(V.dur) && V.dur > 0) ? V.dur : 0;
+  const total = dur ? gifFrameCount(dur, fps) : 0;
+  const canGif = ready && dur > 0;
+
+  vidEl.fps.value = fps;
+  vidEl.fps.disabled = !ready || VIDX.busy;
+  if (vidEl.loop){
+    vidEl.loop.querySelectorAll('button').forEach(b => {
+      b.classList.toggle('on', Number(b.dataset.loop) === VIDX.loop);
+      b.disabled = !ready || VIDX.busy;
+    });
+  }
+  if (vidEl.note){
+    if (!ready) vidEl.note.textContent = '载入视频后可导出单帧 JPG 或转成 GIF';
+    else if (!dur) vidEl.note.textContent = '时长未知，暂不能转 GIF；可先导出当前帧 JPG';
+    else vidEl.note.textContent = total + ' 帧 GIF · ' + size.w + '×' + size.h + ' · ' + fps + 'fps · 时长 ' + dur.toFixed(2) + 's' + ((V.fpsExact && fps !== Math.round(V.fps)) ? ' · 原 ' + V.fps + 'fps' : '');
+  }
+  if (vidEl.jpg) vidEl.jpg.disabled = !ready || VIDX.busy;
+  if (vidEl.gif) vidEl.gif.disabled = !canGif || VIDX.busy;
+  if (vidEl.gif) vidEl.gif.textContent = VIDX.busy ? '转换中…' : '转成 GIF';
+  if (vidEl.cancel) vidEl.cancel.style.display = VIDX.busy ? '' : 'none';
+}
+
+/* ---------- 取帧 ---------- */
+function openHiddenVideo(url){
+  return new Promise((resolve, reject) => {
+    const v = document.createElement('video');
+    v.muted = true;
+    v.playsInline = true;
+    v.preload = 'auto';
+    v.style.cssText = 'position:fixed;left:-100000px;top:0;width:2px;height:2px;opacity:0;pointer-events:none;';
+    let settled = false;
+    const cleanup = () => { v.removeEventListener('loadeddata', ok); v.removeEventListener('error', bad); };
+    const bad = () => { if (settled) return; settled = true; cleanup(); try { v.remove(); } catch (e) {} reject(new Error('视频解码失败')); };
+    const ok = () => { if (settled) return; settled = true; cleanup(); resolve(v); };
+    v.addEventListener('loadeddata', ok);
+    v.addEventListener('error', bad);
+    v.src = url;
+    document.body.appendChild(v);
+    v.load();
+    setTimeout(() => { if (!settled && v.readyState >= 2) ok(); }, 400);
+  });
+}
+
+function vidSeek(v, t){
+  return new Promise(resolve => {
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      v.removeEventListener('seeked', finish);
+      clearTimeout(timer);
+      resolve();
+    };
+    const timer = setTimeout(finish, 2600);
+    v.addEventListener('seeked', finish);
+    const limit = (isFinite(v.duration) && v.duration > 0) ? v.duration : (t + 0.001);
+    const target = Math.max(0, Math.min(t, Math.max(0, limit - 0.001)));
+    if (v.readyState >= 2 && Math.abs(v.currentTime - target) < 0.002) { finish(); return; }
+    try { v.currentTime = target; } catch (e) { finish(); }
+  });
+}
+
+function videoCaptureCanvas(){
+  const V = S.video, v = videoNode();
+  if (!V || !v || !V.ready) return null;
+  const size = videoOutDims();
+  const cv = fxMakeCanvas(size.w, size.h);
+  const ctx = cv.getContext('2d');
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(v, 0, 0, size.w, size.h);
+  return cv;
+}
+
+function videoPauseNow(){
+  const v = videoNode();
+  if (v && !v.paused){ try { v.pause(); } catch (e) {} S.playing = false; setPlayIcon(); }
+}
+
+async function exportVideoJpg(){
+  const V = S.video;
+  if (!V || !V.ready){ toast('请先载入视频'); return; }
+  videoPauseNow();
+  try {
+    const cv = videoCaptureCanvas();
+    if (!cv) throw new Error('视频画面尚未就绪');
+    const blob = await fxCanvasBlob(jpegCanvas(cv), 'image/jpeg', 0.92);
+    if (!blob) throw new Error('JPG 编码失败');
+    const t = videoNode() ? videoNode().currentTime : 0;
+    download(blob, baseName(V.name) + '_' + timeTag(t) + '.jpg');
+    toast('已导出单帧 JPG ' + cv.width + ' × ' + cv.height + '（' + t.toFixed(2) + 's）');
+  } catch (err) {
+    toast('JPG 导出失败：' + String((err && err.message) || err).slice(0, 60));
+  }
+}
+
+/* 视频 → GIF：抽样建全局调色板，再逐帧量化写入 */
+async function videoToGif(){
+  const V = S.video;
+  if (!V || !V.ready || VIDX.busy) return;
+  const fps = Math.max(2, Math.min(30, Math.round(Number(VIDX.fps) || 24)));
+  const dur = (V.dur && isFinite(V.dur)) ? V.dur : 0;
+  if (!dur){ toast('视频时长未知，无法转换为 GIF；可先导出单帧 JPG'); return; }
+
+  const total = gifFrameCount(dur, fps);
+  const size = videoOutDims();
+  if (size.w * size.h > 2500000) toast('尺寸偏大（' + size.w + '×' + size.h + '），GIF 体积会很大，建议先把倍率调小');
+
+  VIDX.busy = true;
+  VIDX.cancel = false;
+  syncVideoExportUI();
+  videoPauseNow();
+  vidStatus('准备解码…', 0);
+
+  let hv = null;
+  try {
+    hv = await openHiddenVideo(V.url);
+    const canvas = fxMakeCanvas(size.w, size.h);
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+    /* 第一遍：抽样统计颜色 */
+    const sampleCount = Math.min(total, 18);
+    const hist = fxHistogram();
+    for (let s = 0; s < sampleCount; s++){
+      if (VIDX.cancel) throw new Error('cancel');
+      const t = sampleCount > 1 ? Math.min(dur - 0.001, (s * dur) / sampleCount) : 0;
+      await vidSeek(hv, t);
+      ctx.drawImage(hv, 0, 0, size.w, size.h);
+      const data = ctx.getImageData(0, 0, size.w, size.h).data;
+      for (let p = 0; p < data.length; p += 16) hist[fxColorKey(data[p], data[p + 1], data[p + 2])]++;
+      vidStatus('分析颜色 ' + (s + 1) + ' / ' + sampleCount, ((s + 1) / sampleCount) * 12);
+      await fxYield();
+    }
+
+    const palette = fxRefinePalette(fxPaletteFromHist(hist, 256), hist, 2);
+    const map = fxBuildMap(hist, palette, 0);
+    const out = new FxBuf();
+    fxWriteGifHeader(out, size.w, size.h, palette, -1, VIDX.loop);
+
+    const indices = new Uint8Array(size.w * size.h);
+    const delayCs = Math.max(2, Math.round(100 / fps));
+
+    /* 第二遍：逐帧取帧 + 量化 + LZW */
+    for (let i = 0; i < total; i++){
+      if (VIDX.cancel) throw new Error('cancel');
+      const t = Math.min(dur - 0.001, i / fps);
+      await vidSeek(hv, t);
+      ctx.drawImage(hv, 0, 0, size.w, size.h);
+      const data = ctx.getImageData(0, 0, size.w, size.h).data;
+
+      let q = 0;
+      for (let p = 0; p < data.length; p += 4){
+        const key = fxColorKey(data[p], data[p + 1], data[p + 2]);
+        let idx = map[key];
+        if (idx < 0){
+          let best = 0, bd = Infinity;
+          for (let k = 0; k < palette.length; k++){
+            const dr = data[p] - palette[k][0], dg = data[p + 1] - palette[k][1], db = data[p + 2] - palette[k][2];
+            const d = dr * dr + dg * dg + db * db;
+            if (d < bd){ bd = d; best = k; }
+          }
+          idx = best;
+          map[key] = idx;
+        }
+        indices[q++] = idx;
+      }
+
+      fxWriteGifFrame(out, indices, size.w, size.h, delayCs, -1);
+      vidStatus('编码 ' + (i + 1) + ' / ' + total + ' 帧 · ' + fmtBytes(out.n), 12 + ((i + 1) / total) * 86);
+      await fxYield();
+    }
+
+    out.byte(0x3B); // trailer
+    const blob = out.blob('image/gif');
+    download(blob, baseName(V.name) + '_' + size.w + 'x' + size.h + '_' + fps + 'fps.gif');
+    vidStatus('已导出 GIF · ' + total + ' 帧 · ' + fmtBytes(blob.size), 100);
+    toast('已转成 GIF（' + total + ' 帧 · ' + fmtBytes(blob.size) + '）');
+  } catch (err) {
+    if (String(err && err.message) === 'cancel'){ vidStatus('已取消', null); toast('已取消转换'); }
+    else { vidStatus('转换失败', null); toast('GIF 转换失败：' + String((err && err.message) || err).slice(0, 60)); }
+  } finally {
+    if (hv){
+      try { hv.pause(); hv.removeAttribute('src'); hv.load(); hv.remove(); } catch (e) {}
+    }
+    VIDX.busy = false;
+    VIDX.cancel = false;
+    syncVideoExportUI();
+  }
+}
+
+/* ---------- 视频绑定 ---------- */
+(function bindVideo(){
+  const v = videoNode();
+  if (v){
+    v.addEventListener('timeupdate', () => { if (!S.scrubbing) syncVideoBar(); });
+    v.addEventListener('play', () => { if (S.view === 'video'){ S.playing = true; setPlayIcon(); } });
+    v.addEventListener('pause', () => { if (S.view === 'video'){ S.playing = false; setPlayIcon(); } });
+    v.addEventListener('seeking', () => { if (S.view === 'video' && !S.scrubbing) syncVideoBar(); });
+  }
+  if (vidEl.fps){
+    vidEl.fps.addEventListener('input', () => {
+      VIDX.fps = Math.max(2, Math.min(30, Math.round(Number(vidEl.fps.value) || 24)));
+      syncVideoExportUI();
+    });
+    vidEl.fps.addEventListener('blur', () => { vidEl.fps.value = VIDX.fps; });
+  }
+  if (vidEl.loop){
+    vidEl.loop.addEventListener('click', e => {
+      const b = e.target.closest('button[data-loop]');
+      if (!b || b.disabled) return;
+      VIDX.loop = Number(b.dataset.loop) || 0;
+      syncVideoExportUI();
+    });
+  }
+  if (vidEl.jpg) vidEl.jpg.addEventListener('click', exportVideoJpg);
+  if (vidEl.gif) vidEl.gif.addEventListener('click', videoToGif);
+  if (vidEl.cancel) vidEl.cancel.addEventListener('click', () => { VIDX.cancel = true; vidStatus('正在取消…', null); });
+})();
+
+/* ============================================================
+   单帧导出（新增）：把当前停留的这一帧导出为 SVG / PNG / JPG
    支持 Lottie / SVG / Android Vector / PNG / JPG / GIF / WEBP / APNG
    只读取现有舞台渲染结果（复用画布渲染工具），不改动原有导出流程
    ============================================================ */
@@ -2868,6 +3559,7 @@ const FRAME = { busy: false };
 function frameViewReady(){
   if (S.view === 'lottie') return !!(S.lottie && S.lottie.work && S.lottie.anim);
   if (S.view === 'xml') return !!(S.xml && (S.xml.svgText || S.xml.text));
+  if (S.view === 'video') return !!(S.video && S.video.ready && videoNode());
   if (S.view === 'image') return !!S.images[S.activeImage];
   return false;
 }
@@ -2875,6 +3567,7 @@ function frameViewReady(){
 function frameBaseName(){
   if (S.view === 'lottie' && S.lottie) return baseName(S.lottie.name);
   if (S.view === 'xml' && S.xml) return baseName(S.xml.name);
+  if (S.view === 'video' && S.video) return baseName(S.video.name);
   if (S.view === 'image' && S.images[S.activeImage]) return baseName(S.images[S.activeImage].name);
   return 'frame';
 }
@@ -2882,6 +3575,10 @@ function frameBaseName(){
 function frameDims(){
   if (S.view === 'lottie' && S.lottie) return [S.lottie.w, S.lottie.h];
   if (S.view === 'xml' && S.xml) return [S.xml.w, S.xml.h];
+  if (S.view === 'video' && S.video) {
+    const f = S.video.scaleF || 1;
+    return [Math.round((S.video.w || 0) * f), Math.round((S.video.h || 0) * f)];
+  }
   const im = S.images[S.activeImage];
   if (im) {
     const f = S.imageScale || 1;
@@ -2892,6 +3589,11 @@ function frameDims(){
 
 /* 播放中先停住，保证导出的是眼前这一帧 */
 function framePause(){
+  if (S.view === 'video') {
+    const v = videoNode();
+    if (v && !v.paused) { try { v.pause(); } catch (e) {} S.playing = false; setPlayIcon(); }
+    return;
+  }
   if (S.view !== 'lottie' || !S.lottie || !S.lottie.anim || !S.playing) return;
   try { S.lottie.anim.pause(); } catch (e) {}
   S.playing = false;
@@ -2997,6 +3699,7 @@ async function exportFrame(kind){
 
   const [w, h] = frameDims();
   const name = frameBaseName();
+  const tag = kind === 'jpg' ? 'JPG' : 'PNG';
 
   try {
     if (S.view === 'lottie') {
@@ -3008,10 +3711,7 @@ async function exportFrame(kind){
         toast('已导出第 ' + idx + ' 帧 SVG（' + w + '×' + h + ' 矢量）');
       } else {
         const cv = await lottieFrameCanvas();
-        const blob = await fxCanvasBlob(cv, 'image/png');
-        if (!blob) throw new Error('PNG 编码失败');
-        download(blob, name + '_frame_' + idx + '.png');
-        toast('已导出第 ' + idx + ' 帧 PNG（' + cv.width + '×' + cv.height + '）');
+        await saveRaster(cv, kind, name + '_frame_' + idx, '第 ' + idx + ' 帧 ' + tag);
       }
     } else if (S.view === 'xml') {
       const svgText = S.xml.svgText || S.xml.text;
@@ -3020,10 +3720,17 @@ async function exportFrame(kind){
         toast('已导出 SVG 矢量（' + w + '×' + h + '）');
       } else {
         const cv = await rasterizeSvg(svgText, w, h);
-        const blob = await fxCanvasBlob(cv, 'image/png');
-        if (!blob) throw new Error('PNG 编码失败');
-        download(blob, name + '_frame.png');
-        toast('已导出 PNG（' + w + '×' + h + '）');
+        await saveRaster(cv, kind, name + '_frame', tag + '（' + w + '×' + h + '）');
+      }
+    } else if (S.view === 'video') {
+      const cv = videoCaptureCanvas();
+      if (!cv) throw new Error('视频画面尚未就绪');
+      if (kind === 'svg') {
+        download(new Blob([frameSvgWrapRaster(cv)], { type: 'image/svg+xml' }), name + '_frame.svg');
+        toast('已导出视频当前帧 SVG（' + cv.width + '×' + cv.height + ' · 位图内嵌）');
+      } else {
+        const t = videoNode() ? videoNode().currentTime : 0;
+        await saveRaster(cv, kind, name + '_' + timeTag(t), '视频当前帧 ' + tag + '（' + t.toFixed(2) + 's）');
       }
     } else {
       const im = S.images[S.activeImage];
@@ -3033,10 +3740,7 @@ async function exportFrame(kind){
         download(new Blob([frameSvgWrapRaster(cv)], { type: 'image/svg+xml' }), name + '_frame.svg');
         toast('已导出当前帧 SVG（' + cv.width + '×' + cv.height + ' · 位图内嵌）');
       } else {
-        const blob = await fxCanvasBlob(cv, 'image/png');
-        if (!blob) throw new Error('PNG 编码失败');
-        download(blob, name + '_frame.png');
-        toast('已导出当前帧 PNG（' + cv.width + '×' + cv.height + '）' + (animated ? ' · 动图已定格此帧，点缩略图可恢复播放' : ''));
+        await saveRaster(cv, kind, name + '_frame', '当前帧 ' + tag + (animated ? ' · 动图已定格此帧，点缩略图可恢复播放' : ''));
       }
     }
   } catch (err) {
@@ -3051,15 +3755,16 @@ function syncFrameUI(){
   if (!el.single) return;
   const ready = frameViewReady();
   el.single.style.display = S.view ? '' : 'none';
-  [el.frameSvg, el.framePng].forEach(b => {
+  [el.frameSvg, el.framePng, el.frameJpg].forEach(b => {
     if (!b) return;
-    b.disabled = !ready || FRAME.busy || FX.busy;
+    b.disabled = !ready || FRAME.busy || FX.busy || VIDX.busy;
     b.classList.toggle('busy', FRAME.busy);
   });
 }
 
 if (el.frameSvg) el.frameSvg.addEventListener('click', () => exportFrame('svg'));
 if (el.framePng) el.framePng.addEventListener('click', () => exportFrame('png'));
+if (el.frameJpg) el.frameJpg.addEventListener('click', () => exportFrame('jpg'));
 window.__frameSync = syncFrameUI;
 syncFrameUI();
 
