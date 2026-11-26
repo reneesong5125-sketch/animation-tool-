@@ -384,7 +384,7 @@ body{
           <div class="zone-ext">.mp4 / .mov / .webm</div>
         </div>
       </div>
-      <div class="zone-body"><span class="hintline">拖入视频，可导出单帧 JPG 或转成 GIF</span></div>
+      <div class="zone-body"><span class="hintline">拖入视频，可播放、拖时间轴，导出序列帧 / GIF / MP4</span></div>
       <input type="file" id="fileVideo" accept="video/mp4,video/quicktime,video/webm,.mp4,.mov,.m4v,.webm">
     </div>
 
@@ -410,7 +410,7 @@ body{
         <span>· 鼠标移入舞台会虚线标出画布边界与尺寸；点色块立即弹出系统取色器。</span>
         <span>· 图片以 base64 内嵌进 JSON；引用外部路径的资源会提示。</span>
         <span>· GIF / WEBP 会识别格式、帧数与时长；动图按原尺寸导出保持逐帧。</span>
-        <span>· 视频（MP4 / MOV / WEBM）可播放、拖时间轴，用「尺寸倍率」决定导出尺寸，再导出单帧 JPG 或转成 GIF。</span>
+        <span>· 视频（MP4 / MOV / WEBM）可播放、拖时间轴；Lottie / 视频 / 动图 都能在「导出」卡里出序列帧、GIF、MP4，Lottie 另有 JSON。</span>
         <span>· 拖入文件即自动播放；停在某一帧后，用进度条右侧的 SVG / PNG 导出这一张定帧（GIF / WEBP / XML 同样适用）。</span>
         <span>· 全部在本机处理，不上传。</span>
       </div>
@@ -511,41 +511,17 @@ body{
       <div class="assets" id="assets"></div>
     </div>
 
-    <div class="card" id="secVideo" style="display:none">
-      <h2>视频导出</h2>
-      <div class="fx-opts">
-        <div class="fx-row">
-          <span class="fx-k">帧率</span>
-          <input class="fx-num" id="vidFps" type="number" min="2" max="30" step="1" value="24" aria-label="视频转 GIF 帧率"><em class="fx-unit">fps</em>
-          <span class="fx-k" style="min-width:0;margin-left:auto;padding-left:6px">循环</span>
-          <div class="fx-seg" id="vidLoop" style="flex:0 0 104px">
-            <button type="button" data-loop="0" class="on">无限</button>
-            <button type="button" data-loop="1">1 次</button>
-            <button type="button" data-loop="2">2 次</button>
-          </div>
-        </div>
-        <div class="fx-note" id="vidNote">—</div>
-        <div class="fx-prog" id="vidProg" style="display:none"><i id="vidFill"></i></div>
-        <div class="fx-acts">
-          <button type="button" class="btn" id="vidJpg">导出当前帧 JPG</button>
-          <button type="button" class="btn primary" id="vidGif">转成 GIF</button>
-          <button type="button" class="btn" id="vidCancel" style="display:none">取消</button>
-        </div>
-        <div class="fx-stat" id="vidStat"></div>
-      </div>
-      <div class="scale-note">导出尺寸由上方的「尺寸倍率」决定，JPG 与 GIF 都按该尺寸渲染。</div>
-    </div>
-
     <div class="card" id="secExport">
       <h2>导出</h2>
       <div class="fx-fmt" id="fxFmt">
         <button type="button" data-fmt="json" class="on">JSON</button>
         <button type="button" data-fmt="seq">序列帧</button>
         <button type="button" data-fmt="gif">GIF</button>
+        <button type="button" data-fmt="mp4">MP4</button>
       </div>
 
       <div class="fx-opts" id="fxOpts" style="display:none">
-        <div class="fx-row">
+        <div class="fx-row" data-only="lottie">
           <span class="fx-k">倍率</span>
           <div class="fx-seg" id="fxScale">
             <button type="button" data-s="0.5">0.5×</button>
@@ -553,7 +529,7 @@ body{
             <button type="button" data-s="2">2×</button>
           </div>
         </div>
-        <div class="fx-row">
+        <div class="fx-row" data-only="lottie">
           <span class="fx-k">背景</span>
           <div class="fx-seg" id="fxBg">
             <button type="button" data-bg="transparent" class="on">透明</button>
@@ -561,11 +537,11 @@ body{
             <button type="button" data-bg="light">白色</button>
           </div>
         </div>
-        <div class="fx-row" data-only="gif">
+        <div class="fx-row" data-only="fps">
           <span class="fx-k">帧率</span>
-          <input class="fx-num" id="fxFps" type="number" min="2" max="50" step="1" value="30" aria-label="GIF 帧率"><em class="fx-unit">fps</em>
-          <span class="fx-k" style="min-width:0;margin-left:auto;padding-left:6px">循环</span>
-          <div class="fx-seg" id="fxLoop" style="flex:0 0 104px">
+          <input class="fx-num" id="fxFps" type="number" min="2" max="60" step="1" value="30" aria-label="导出帧率"><em class="fx-unit">fps</em>
+          <span class="fx-k" data-only="gif" style="min-width:0;margin-left:auto;padding-left:6px">循环</span>
+          <div class="fx-seg" id="fxLoop" style="flex:0 0 104px" data-only="gif">
             <button type="button" data-loop="0" class="on">无限</button>
             <button type="button" data-loop="1">1 次</button>
             <button type="button" data-loop="2">2 次</button>
@@ -1443,14 +1419,11 @@ function showView(type){
   }
 
   const secExp = document.getElementById('secExport');
-  const secVideo = document.getElementById('secVideo');
-  if (secExp) secExp.style.display = isVideo ? 'none' : '';
-  if (secVideo) secVideo.style.display = isVideo ? '' : 'none';
+  if (secExp) secExp.style.display = type ? '' : 'none';
 
   el.secAssets.style.display = (isLottie && S.lottie && listImageAssets(S.lottie.baseData).length) ? '' : 'none';
   renderDocbar();
   renderSwatches();
-  if (isVideo) syncVideoExportUI();
   if (window.__fxSync) window.__fxSync();
   if (window.__frameSync) window.__frameSync();
 }
@@ -1618,7 +1591,7 @@ function setScale(f){
     updateVideoSpecs(); updateScaleUI();
     const v = videoNode();
     if (v && S.video.ready) fitContent(S.video.w, S.video.h, v);
-    syncVideoExportUI();
+    if (window.__fxSync) window.__fxSync();
   } else if (S.view === 'image') {
     S.imageScale = f; updateImageSpecs(); updateScaleUI();
     const im = S.images[S.activeImage];
@@ -1644,7 +1617,7 @@ function renderSwatches(){
   }
   if (info.kind === 'image' || info.kind === 'video') {
     el.swatches.innerHTML = '<div class="hint">' + (info.kind === 'video'
-      ? '视频是位流，不提供选色编辑；可导出单帧 JPG 或转成 GIF。'
+      ? '视频是位流，不提供选色编辑；可在下方「导出」卡出序列帧 / GIF / MP4，或存单帧 JPG。'
       : '图片为位图，不提供选色编辑；可在 Lottie / XML 视图中改矢量颜色。') + '</div>';
     return;
   }
@@ -1754,7 +1727,7 @@ function updateZoneStates(){
     const V = S.video;
     zv.querySelector('.zone-body').innerHTML = V
       ? `<div class="zone-file"><div><div class="fn">${escapeHtml(V.name)}</div><div class="fs">${V.w || '?'}×${V.h || '?'} · ${(V.dur && isFinite(V.dur)) ? V.dur.toFixed(2) + 's' : '解析中'} · ${fmtBytes(V.bytes)}</div></div><button class="mini-x" data-clear="video" title="移除">✕</button></div>`
-      : '<span class="hintline">拖入视频，可导出单帧 JPG 或转成 GIF</span>';
+      : '<span class="hintline">拖入视频，可播放、拖时间轴，导出序列帧 / GIF / MP4</span>';
   }
 
   // 图片素材区：内嵌图（来自当前 Lottie）+ 独立导入图
@@ -1818,7 +1791,6 @@ function updateExports(){
     (S.view === 'image' && S.images[S.activeImage])
   );
   el.btnCopy.disabled = !(ready && S.view !== 'image' && S.view !== 'video');
-  syncVideoExportUI();
   if (window.__fxSync) window.__fxSync();
   if (window.__frameSync) window.__frameSync();
 }
@@ -2185,7 +2157,7 @@ el.docbar.addEventListener('click', e => {
   const type = chip.dataset.view;
   if (type === 'lottie' && S.lottie) { showView('lottie'); updateLottieSpecs(); updateScaleUI(); renderSwatches(); fitContent(S.lottie.w, S.lottie.h, el.animOut); }
   else if (type === 'xml' && S.xml) { showView('xml'); rebuildXml(); renderSwatches(); }
-  else if (type === 'video' && S.video) { showView('video'); updateVideoSpecs(); updateScaleUI(); renderSwatches(); syncVideoExportUI(); if (S.video.ready) fitContent(S.video.w, S.video.h, videoNode()); }
+  else if (type === 'video' && S.video) { showView('video'); updateVideoSpecs(); updateScaleUI(); renderSwatches(); if (window.__fxSync) window.__fxSync(); if (S.video.ready) fitContent(S.video.w, S.video.h, videoNode()); }
   else if (type === 'image') { setActiveImage(Number(chip.dataset.idx)); }
 });
 
@@ -2324,10 +2296,10 @@ window.addEventListener('resize', () => {
 });
 
 /* ============================================================
-   多格式导出（新增）：序列帧 PNG(ZIP) / GIF
-   只读取现有的 S.lottie.work、画布尺寸与帧率；原有 JSON 导出逻辑不变
+   多格式导出：序列帧 PNG(ZIP) / GIF / MP4（Lottie 另有 JSON）
+   源支持 Lottie / 视频 / GIF·WEBP 动图；尺寸取「尺寸倍率」
    ============================================================ */
-const FX = { fmt: 'json', scale: 1, bg: 'transparent', fps: 30, loop: 0, busy: false, cancel: false, lastLottie: null };
+const FX = { fmt: 'json', scale: 1, bg: 'transparent', fps: 30, loop: 0, busy: false, cancel: false, lastKey: '' };
 
 const fxEl = {
   fmt: $('#fxFmt'), opts: $('#fxOpts'), scale: $('#fxScale'), bg: $('#fxBg'),
@@ -2338,16 +2310,83 @@ const fxEl = {
 
 const FX_BG_COLOR = { dark: '#101113', light: '#f2f0ec' };
 
-/* ---------- 尺寸 / 帧数 ---------- */
-function fxLottieReady(){ return !!(S.view === 'lottie' && S.lottie && S.lottie.work); }
-
-function fxSize(){
-  const L = S.lottie || {};
-  const w = Math.max(1, Math.round((Number(L.w) || 1) * FX.scale));
-  const h = Math.max(1, Math.round((Number(L.h) || 1) * FX.scale));
-  return { w: Math.min(4096, w), h: Math.min(4096, h) };
+/* ---------- 当前源 / 可用格式 ---------- */
+function fxKind(){
+  if (S.view === 'lottie' && S.lottie && S.lottie.work) return 'lottie';
+  if (S.view === 'video' && S.video && S.video.ready) return 'video';
+  if (S.view === 'xml' && S.xml && (S.xml.svgText || S.xml.text)) return 'xml';
+  if (S.view === 'image' && S.images[S.activeImage]){
+    const im = S.images[S.activeImage];
+    return (im.meta && im.meta.animated) ? 'anim' : 'image';
+  }
+  return '';
 }
 
+function fxCaps(kind){
+  const k = kind || fxKind();
+  const anim = (k === 'lottie' || k === 'video' || k === 'anim');
+  return { json: k === 'lottie', seq: anim, gif: anim, mp4: anim };
+}
+
+function fxKeyName(){
+  const kind = fxKind();
+  if (kind === 'lottie') return 'L:' + ((S.lottie && S.lottie.name) || '');
+  if (kind === 'video') return 'V:' + ((S.video && S.video.name) || '');
+  if (kind === 'xml') return 'X:' + ((S.xml && S.xml.name) || '');
+  const im = S.images[S.activeImage] || {};
+  return 'I:' + (im.id || im.name || '');
+}
+
+function fxOutSize(){
+  const kind = fxKind();
+  if (kind === 'lottie'){
+    const L = S.lottie || {};
+    return {
+      w: Math.min(4096, Math.max(1, Math.round((Number(L.w) || 1) * FX.scale))),
+      h: Math.min(4096, Math.max(1, Math.round((Number(L.h) || 1) * FX.scale)))
+    };
+  }
+  const s = canvasSizeNow();
+  return {
+    w: Math.min(4096, Math.max(1, Math.round((s && s[0]) || 1))),
+    h: Math.min(4096, Math.max(1, Math.round((s && s[1]) || 1)))
+  };
+}
+
+function fxNativeFps(){
+  const kind = fxKind();
+  if (kind === 'lottie') return Math.max(1, Math.round(Number((S.lottie || {}).fr) || 30));
+  if (kind === 'video') return Math.max(2, Math.round((S.video || {}).fps || 24));
+  if (kind === 'anim') return Math.max(2, Math.round((((S.images[S.activeImage] || {}).meta) || {}).fps || 12));
+  return 30;
+}
+
+function fxDur(){
+  const kind = fxKind();
+  if (kind === 'lottie'){
+    const fr = Math.max(1, Math.round(Number((S.lottie || {}).fr) || 30));
+    const frames = fxFrames();
+    return { dur: frames / fr, fps: fr, frames };
+  }
+  if (kind === 'video'){
+    const V = S.video || {};
+    return { dur: (isFinite(V.dur) && V.dur > 0) ? V.dur : 0, fps: fxNativeFps(), frames: V.frames || 0 };
+  }
+  if (kind === 'anim'){
+    const m = ((S.images[S.activeImage] || {}).meta) || {};
+    return { dur: m.durMs ? m.durMs / 1000 : 0, fps: fxNativeFps(), frames: m.frames || 0 };
+  }
+  return { dur: 0, fps: 0, frames: 0 };
+}
+
+function fxTotal(fps){
+  if (fxKind() === 'lottie') return Math.max(1, fxFrames());
+  const d = fxDur();
+  if (!d.dur) return 0;
+  return Math.max(1, Math.min(900, Math.round(d.dur * fps)));
+}
+
+/* ---------- 尺寸 / 帧数（Lottie） ---------- */
 function fxFrames(){
   const L = S.lottie;
   if (!L) return 0;
@@ -2363,51 +2402,105 @@ function fxStatus(text, pct){
   if (fxEl.fill && pct !== null && pct !== undefined) fxEl.fill.style.width = Math.max(0, Math.min(100, pct)) + '%';
 }
 
+function fxMp4Mime(){
+  if (typeof MediaRecorder === 'undefined') return '';
+  const cands = ['video/mp4;codecs=avc1.42E01E', 'video/mp4;codecs=avc1', 'video/mp4',
+                 'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
+  for (const m of cands){ try { if (MediaRecorder.isTypeSupported(m)) return m; } catch (e) {} }
+  return '';
+}
+
+function fxCodecLabel(){
+  const m = fxMp4Mime();
+  if (!m) return '浏览器不支持录制';
+  return /mp4/i.test(m) ? 'H.264 MP4' : 'WebM（此浏览器无 MP4 编码）';
+}
+
 function fxNote(){
   if (!fxEl.note) return;
-  if (FX.fmt === 'json') { fxEl.note.textContent = '导出为紧凑 JSON，按倍率精简坐标精度，尺寸越小文件越轻'; return; }
-  if (!fxLottieReady()) { fxEl.note.textContent = '载入 Lottie JSON 后可导出序列帧 / GIF'; return; }
-  const size = fxSize(), frames = fxFrames();
-  if (FX.fmt === 'gif') {
-    const dur = (frames / FX.fps).toFixed(2);
-    fxEl.note.textContent = frames + ' 帧 · ' + size.w + '×' + size.h + ' · ' + FX.fps + 'fps · 时长 ' + dur + 's'
-      + ' · 256 色调色板' + (FX.fps > 30 ? ' · 帧率偏高，体积会变大' : '');
+  const kind = fxKind(), caps = fxCaps(kind);
+  if (!kind){ fxEl.note.textContent = '导入 Lottie / 视频 / 动图后，这里可导出序列帧、GIF、MP4'; return; }
+  if (!caps[FX.fmt]){
+    if (kind === 'xml' || kind === 'image') fxEl.note.textContent = 'SVG / 静态图片不做逐帧导出，请用底部「单帧」条';
+    else if (FX.fmt === 'json') fxEl.note.textContent = 'JSON 只适用于 Lottie 源；视频 / 动图请用序列帧、GIF 或 MP4';
+    else fxEl.note.textContent = '当前格式不可用';
+    return;
+  }
+  if (FX.fmt === 'json'){ fxEl.note.textContent = '导出为紧凑 JSON，按倍率精简坐标精度，尺寸越小文件越轻'; return; }
+  const size = fxOutSize();
+  const fps = Math.max(2, Math.min(60, Math.round(Number(FX.fps) || fxNativeFps())));
+  const total = fxTotal(fps);
+  if (!total){ fxEl.note.textContent = '时长未知，暂不能逐帧导出；可先导出单帧 JPG'; return; }
+  const durTxt = (total / fps).toFixed(2);
+  if (FX.fmt === 'gif'){
+    fxEl.note.textContent = total + ' 帧 · ' + size.w + '×' + size.h + ' · ' + fps + 'fps · 时长 ' + durTxt + 's · 256 色'
+      + (fps > 30 ? ' · 帧率偏高，体积会变大' : '');
+  } else if (FX.fmt === 'mp4'){
+    fxEl.note.textContent = total + ' 帧 · ' + size.w + '×' + size.h + ' · ' + fps + 'fps · 时长 ' + durTxt + 's · ' + fxCodecLabel() + ' · 实时录制，约需 ' + durTxt + 's';
   } else {
-    fxEl.note.textContent = frames + ' 帧 PNG · ' + size.w + '×' + size.h + ' · 打包为 ZIP';
+    fxEl.note.textContent = total + ' 帧 PNG · ' + size.w + '×' + size.h + ' · 打包为 ZIP';
   }
 }
 
 /* ---------- 面板状态 ---------- */
+function fxShowRow(mark, on){
+  document.querySelectorAll('#fxOpts [data-only="' + mark + '"]').forEach(n => { n.style.display = on ? '' : 'none'; });
+}
+
 function syncFrameExportUI(){
   if (!fxEl.fmt) return;
-  const ready = fxLottieReady();
-  if (!ready && FX.fmt !== 'json') FX.fmt = 'json';   // 非 Lottie 视图回落到 JSON，避免误禁用原按钮
+  const kind = fxKind(), caps = fxCaps(kind);
 
-  if (S.lottie && S.lottie !== FX.lastLottie) {
-    FX.lastLottie = S.lottie;
-    const f = Math.max(2, Math.min(50, Math.round(Number(S.lottie.fr) || 30)));
-    FX.fps = f;
-    if (fxEl.fps) fxEl.fps.value = f;
+  if (kind){
+    const key = kind + '|' + fxKeyName();
+    if (key !== FX.lastKey){
+      FX.lastKey = key;
+      const f = Math.max(2, Math.min(60, Math.round(fxNativeFps())));
+      FX.fps = f;
+    }
+  }
+
+  if (!caps[FX.fmt]){
+    const order = ['json', 'seq', 'gif', 'mp4'];
+    FX.fmt = order.filter(k => caps[k])[0] || 'json';
   }
 
   fxEl.fmt.querySelectorAll('button').forEach(b => {
-    b.disabled = (b.dataset.fmt !== 'json') && !ready;
-    b.classList.toggle('on', b.dataset.fmt === FX.fmt);
+    const k = b.dataset.fmt;
+    b.disabled = !caps[k] || FX.busy;
+    b.classList.toggle('on', k === FX.fmt);
   });
 
   const isJson = FX.fmt === 'json';
-  if (fxEl.opts) fxEl.opts.style.display = (isJson || !ready) ? 'none' : '';
-  if (el.btnExport2) el.btnExport2.style.display = isJson ? '' : 'none';
-  if (el.btnCopy) el.btnCopy.style.display = isJson ? '' : 'none';
-  if (fxEl.jsonNote) fxEl.jsonNote.style.display = isJson ? '' : 'none';
+  if (fxEl.opts) fxEl.opts.style.display = (kind && !isJson) ? '' : 'none';
+  fxShowRow('lottie', kind === 'lottie');
+  fxShowRow('fps', FX.fmt !== 'json' && (FX.fmt !== 'seq' || kind !== 'lottie'));
+  fxShowRow('gif', FX.fmt === 'gif');
 
-  document.querySelectorAll('#fxOpts [data-only="gif"]').forEach(n => {
-    n.style.display = (FX.fmt === 'gif') ? '' : 'none';
+  if (el.btnExport2) el.btnExport2.style.display = (isJson && caps.json) ? '' : 'none';
+  if (el.btnCopy) el.btnCopy.style.display = (isJson && caps.json) ? '' : 'none';
+  if (fxEl.jsonNote) fxEl.jsonNote.style.display = (isJson && caps.json) ? '' : 'none';
+
+  if (fxEl.fps){
+    fxEl.fps.disabled = !kind || FX.busy;
+    if (document.activeElement !== fxEl.fps) fxEl.fps.value = Math.max(2, Math.min(60, Math.round(Number(FX.fps) || 30)));
+  }
+  if (fxEl.loop) fxEl.loop.querySelectorAll('button').forEach(b => {
+    b.classList.toggle('on', Number(b.dataset.loop) === FX.loop);
+    b.disabled = !kind || FX.busy;
+  });
+  if (fxEl.scale) fxEl.scale.querySelectorAll('button').forEach(b => {
+    b.classList.toggle('on', Number(b.dataset.s) === FX.scale);
+    b.disabled = kind !== 'lottie' || FX.busy;
+  });
+  if (fxEl.bg) fxEl.bg.querySelectorAll('button').forEach(b => {
+    b.classList.toggle('on', b.dataset.bg === FX.bg);
+    b.disabled = kind !== 'lottie' || FX.busy;
   });
 
-  if (fxEl.run) {
-    fxEl.run.textContent = FX.fmt === 'gif' ? '导出 GIF' : '导出序列帧';
-    fxEl.run.disabled = !ready || FX.busy;
+  if (fxEl.run){
+    fxEl.run.textContent = FX.fmt === 'gif' ? '导出 GIF' : (FX.fmt === 'mp4' ? '导出 MP4' : '导出序列帧');
+    fxEl.run.disabled = !kind || !caps[FX.fmt] || FX.busy;
   }
   if (fxEl.cancel) fxEl.cancel.style.display = FX.busy ? '' : 'none';
   if (window.__frameSync) window.__frameSync();
@@ -2779,22 +2872,122 @@ function fxFrameName(i, total){
   return String(i).padStart(width, '0') + '.png';
 }
 
+/* ---------- 统一帧源：把 Lottie / 视频 / 动图 包成「按时间取帧」 ---------- */
+function fxEven(n){ return Math.max(2, Math.round((Number(n) || 2) / 2) * 2); }
+
+async function fxOpenAnimFrames(url, type){
+  if (typeof ImageDecoder === 'undefined') throw new Error('当前浏览器不支持动图逐帧解码');
+  let data = null;
+  try { data = await (await fetch(url)).arrayBuffer(); } catch (e) { throw new Error('动图读取失败'); }
+  let dec = null;
+  try {
+    dec = new ImageDecoder({ data, type: /webp/i.test(type || '') ? 'image/webp' : 'image/gif' });
+    await dec.tracks.ready;
+    try { await dec.completed; } catch (e) {}
+  } catch (e) {
+    throw new Error('动图逐帧解码失败');
+  }
+  const track = dec.tracks.selectedTrack;
+  const count = Math.min(500, (track && track.frameCount) || 0);
+  const frames = [];
+  let total = 0;
+  for (let i = 0; i < count; i++){
+    try {
+      const r = await dec.decode({ frameIndex: i });
+      const img = r.image;
+      let d = (img.duration || 0) / 1e6;
+      if (!(d > 0)) d = 0.1;
+      frames.push({ img, at: total, dur: d });
+      total += d;
+    } catch (e) { break; }
+  }
+  return {
+    frames,
+    dur: total,
+    close(){
+      frames.forEach(f => { try { f.img.close(); } catch (e) {} });
+      try { dec.close(); } catch (e) {}
+    }
+  };
+}
+
+async function fxOpenSource(){
+  const kind = fxKind();
+  const size = fxOutSize();
+  const W = size.w, H = size.h;
+  const name = frameBaseName();
+
+  if (kind === 'lottie'){
+    const L = S.lottie;
+    const r = await fxOpenCanvasAnim(L.work, W, H);
+    const fr = Math.max(1, Math.round(Number(L.fr) || 30));
+    const frames = Math.max(1, fxFrames());
+    return {
+      kind, name, w: W, h: H, fps: fr, dur: frames / fr, total: frames, frames,
+      async seek(t, canvas, bg){
+        fxDrawFrame(r, canvas, Math.max(0, Math.min(frames - 1, Math.round(t * fr))), bg);
+      },
+      close(){ fxCloseAnim(r); }
+    };
+  }
+
+  if (kind === 'video'){
+    const V = S.video;
+    const fps = Math.max(2, Math.min(60, Math.round(Number(FX.fps) || 30)));
+    const dur = (isFinite(V.dur) && V.dur > 0) ? V.dur : 0;
+    const hv = await openHiddenVideo(V.url);
+    const total = Math.max(1, Math.min(900, Math.round(dur * fps)));
+    return {
+      kind, name, w: W, h: H, fps, dur, total, frames: V.frames || 0,
+      async seek(t, canvas){
+        await vidSeek(hv, Math.min(Math.max(0, dur - 0.001), Math.max(0, t)));
+        const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingQuality = 'high';
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(hv, 0, 0, canvas.width, canvas.height);
+      },
+      close(){ try { hv.pause(); hv.removeAttribute('src'); hv.load(); hv.remove(); } catch (e) {} }
+    };
+  }
+
+  if (kind === 'anim'){
+    const im = S.images[S.activeImage];
+    const fps = Math.max(2, Math.min(60, Math.round(Number(FX.fps) || 12)));
+    const a = await fxOpenAnimFrames(im.url, im.type);
+    if (!a.frames.length){ a.close(); throw new Error('动图逐帧解码失败'); }
+    const dur = Math.max(0.02, a.dur);
+    const total = Math.max(1, Math.min(900, Math.round(dur * fps)));
+    return {
+      kind, name, w: W, h: H, fps, dur, total, frames: a.frames.length,
+      async seek(t, canvas){
+        const s = Math.max(0, Math.min(dur - 0.0001, t));
+        let i = 0;
+        for (let k = a.frames.length - 1; k >= 0; k--){ if (a.frames[k].at <= s + 1e-6){ i = k; break; } }
+        const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingQuality = 'high';
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(a.frames[i].img, 0, 0, canvas.width, canvas.height);
+      },
+      close(){ a.close(); }
+    };
+  }
+
+  throw new Error('当前视图不支持逐帧导出');
+}
+
 /* ---------- 序列帧导出 ---------- */
 async function fxExportSequence(){
-  const L = S.lottie;
-  const size = fxSize();
-  const total = fxFrames();
+  const prov = await fxOpenSource();
+  const fps = Math.max(1, prov.fps), total = prov.total;
+  const canvas = fxMakeCanvas(prov.w, prov.h);
   const entries = [];
   let bytes = 0;
 
-  fxStatus('准备渲染 ' + size.w + '×' + size.h + '…', 0);
-  const renderer = await fxOpenCanvasAnim(L.work, size.w, size.h);
-  const canvas = fxMakeCanvas(size.w, size.h);
-
+  fxStatus('准备渲染 ' + prov.w + '×' + prov.h + '…', 0);
   try {
-    for (let i = 0; i < total; i++) {
+    for (let i = 0; i < total; i++){
       if (FX.cancel) throw new Error('cancel');
-      fxDrawFrame(renderer, canvas, i, FX.bg);
+      await prov.seek(i / fps, canvas, FX.bg);
       const blob = await fxCanvasBlob(canvas, 'image/png');
       if (!blob) throw new Error('PNG 编码失败');
       const buf = new Uint8Array(await blob.arrayBuffer());
@@ -2804,24 +2997,23 @@ async function fxExportSequence(){
       await fxYield();
     }
   } finally {
-    fxCloseAnim(renderer);
+    try { prov.close(); } catch (e) {}
   }
 
   const info = [
-    'name: ' + baseName(L.name),
-    'size: ' + size.w + ' x ' + size.h,
+    'source: ' + prov.name + ' (' + prov.kind + ')',
+    'size: ' + prov.w + ' x ' + prov.h,
     'frames: ' + total,
-    'fps: ' + (L.fr || 60),
-    'duration: ' + (total / (L.fr || 60)).toFixed(3) + 's',
-    'background: ' + FX.bg,
-    'scale: ' + FX.scale + 'x (current canvas ' + L.w + ' x ' + L.h + ')',
+    'fps: ' + fps,
+    'duration: ' + (total / fps).toFixed(3) + 's',
+    'background: ' + (prov.kind === 'lottie' ? FX.bg : 'image'),
     ''
   ].join('\n');
   entries.push({ name: 'info.txt', data: new TextEncoder().encode(info) });
 
   fxStatus('打包 ZIP…', 95);
   const zip = fxZip(entries);
-  const fileName = baseName(L.name) + '_frames_' + size.w + 'x' + size.h + '_' + total + 'f.zip';
+  const fileName = baseName(prov.name) + '_frames_' + prov.w + 'x' + prov.h + '_' + total + 'f.zip';
   download(zip, fileName);
   fxStatus('已导出 ' + total + ' 帧 · ' + fmtBytes(zip.size), 100);
   toast('已导出序列帧 ' + total + ' 帧（' + fmtBytes(zip.size) + '）');
@@ -2829,29 +3021,26 @@ async function fxExportSequence(){
 
 /* ---------- GIF 导出 ---------- */
 async function fxExportGif(){
-  const L = S.lottie;
-  const size = fxSize();
-  const total = fxFrames();
-  const transparent = FX.bg === 'transparent';
-  const fps = Math.max(2, Math.min(50, Number(FX.fps) || 30));
-
-  fxStatus('分析颜色…', 0);
-  /* 第一遍：抽样帧统计颜色，建立全局调色板 */
-  const sampleCount = Math.min(total, 16);
-  const hist = fxHistogram();
-  let hasAlpha = false;
-  const renderer = await fxOpenCanvasAnim(L.work, size.w, size.h);
-  const canvas = fxMakeCanvas(size.w, size.h);
+  const prov = await fxOpenSource();
+  const fps = Math.max(2, Math.min(30, Math.round(Number(FX.fps) || prov.fps || 24)));
+  const total = Math.max(1, Math.min(900, prov.kind === 'lottie' ? prov.total : Math.round(prov.dur * fps)));
+  const transparent = prov.kind === 'lottie' && FX.bg === 'transparent';
+  const canvas = fxMakeCanvas(prov.w, prov.h);
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
+  fxStatus('分析颜色…', 0);
   try {
-    for (let s = 0; s < sampleCount; s++) {
+    /* 第一遍：抽样帧统计颜色，建立全局调色板 */
+    const sampleCount = Math.min(total, 16);
+    const hist = fxHistogram();
+    let hasAlpha = false;
+
+    for (let s = 0; s < sampleCount; s++){
       if (FX.cancel) throw new Error('cancel');
-      const frame = Math.min(total - 1, Math.round((s * (total - 1)) / Math.max(1, sampleCount - 1)));
-      fxDrawFrame(renderer, canvas, frame, FX.bg);
-      const data = ctx.getImageData(0, 0, size.w, size.h).data;
-      const step = 4;
-      for (let p = 0; p < data.length; p += 4 * step) {
+      const t = total > 1 ? ((s * (total - 1)) / Math.max(1, sampleCount - 1)) / fps : 0;
+      await prov.seek(t, canvas, FX.bg);
+      const data = ctx.getImageData(0, 0, prov.w, prov.h).data;
+      for (let p = 0; p < data.length; p += 16){
         if (data[p + 3] < 128) { if (transparent) hasAlpha = true; continue; }
         hist[fxColorKey(data[p], data[p + 1], data[p + 2])]++;
       }
@@ -2868,31 +3057,25 @@ async function fxExportGif(){
     /* 第二遍：逐帧量化 + LZW，直接写入 GIF */
     const out = new FxBuf();
     const gifPalette = hasAlpha ? [[0, 0, 0]].concat(palette) : palette;
-    fxWriteGifHeader(out, size.w, size.h, gifPalette, transIndex, FX.loop);
+    fxWriteGifHeader(out, prov.w, prov.h, gifPalette, transIndex, FX.loop);
 
-    const indices = new Uint8Array(size.w * size.h);
-    const delays = [];
-    for (let i = 0; i < total; i++) {
-      const cs = Math.round(((i + 1) * 100) / fps) - Math.round((i * 100) / fps);
-      delays.push(Math.max(2, cs));
-    }
-
-    for (let i = 0; i < total; i++) {
+    const indices = new Uint8Array(prov.w * prov.h);
+    for (let i = 0; i < total; i++){
       if (FX.cancel) throw new Error('cancel');
-      fxDrawFrame(renderer, canvas, i, FX.bg);
-      const data = ctx.getImageData(0, 0, size.w, size.h).data;
+      await prov.seek(i / fps, canvas, FX.bg);
+      const data = ctx.getImageData(0, 0, prov.w, prov.h).data;
 
       let q = 0;
-      for (let p = 0; p < data.length; p += 4) {
-        if (data[p + 3] < 128) {
+      for (let p = 0; p < data.length; p += 4){
+        if (data[p + 3] < 128){
           indices[q++] = hasAlpha ? transIndex : 0;
           continue;
         }
         const key = fxColorKey(data[p], data[p + 1], data[p + 2]);
         let idx = map[key];
-        if (idx < 0) {
+        if (idx < 0){
           let best = 0, bd = Infinity;
-          for (let k = 0; k < palette.length; k++) {
+          for (let k = 0; k < palette.length; k++){
             const dr = data[p] - palette[k][0], dg = data[p + 1] - palette[k][1], db = data[p + 2] - palette[k][2];
             const d = dr * dr + dg * dg + db * db;
             if (d < bd) { bd = d; best = k; }
@@ -2903,26 +3086,107 @@ async function fxExportGif(){
         indices[q++] = idx;
       }
 
-      fxWriteGifFrame(out, indices, size.w, size.h, delays[i], transIndex);
+      const cs = Math.round(((i + 1) * 100) / fps) - Math.round((i * 100) / fps);
+      fxWriteGifFrame(out, indices, prov.w, prov.h, Math.max(2, cs), transIndex);
       fxStatus('编码 ' + (i + 1) + ' / ' + total + ' 帧 · ' + fmtBytes(out.n), 12 + ((i + 1) / total) * 86);
       await fxYield();
     }
 
     out.byte(0x3B); // trailer
     const blob = out.blob('image/gif');
-    const fileName = baseName(L.name) + '_' + size.w + 'x' + size.h + '_' + fps + 'fps.gif';
+    const fileName = baseName(prov.name) + '_' + prov.w + 'x' + prov.h + '_' + fps + 'fps.gif';
     download(blob, fileName);
     fxStatus('已导出 GIF · ' + total + ' 帧 · ' + fmtBytes(blob.size), 100);
     toast('已导出 GIF（' + total + ' 帧 · ' + fmtBytes(blob.size) + '）');
   } finally {
-    fxCloseAnim(renderer);
+    try { prov.close(); } catch (e) {}
   }
+}
+
+/* ---------- MP4 导出（canvas + MediaRecorder；无 MP4 编码时回落 WebM） ---------- */
+async function fxExportMp4(){
+  const prov = await fxOpenSource();
+  const mime = fxMp4Mime();
+  if (!mime) throw new Error('当前浏览器不支持视频录制');
+  const fps = Math.max(2, Math.min(60, Math.round(prov.fps)));
+  const total = Math.max(1, Math.min(900, prov.kind === 'lottie' ? prov.total : Math.round(prov.dur * fps)));
+  const W = fxEven(prov.w), H = fxEven(prov.h);
+  const canvas = fxMakeCanvas(W, H);
+  const ctx = canvas.getContext('2d');
+  const bg = prov.kind === 'lottie' ? FX.bg : 'dark';
+
+  /* 预渲染每帧，录制阶段只贴图，避免边解码边录制造成掉帧/时间轴拉长 */
+  const pre = [];
+  const canPre = (W * H * total) <= 320000000;
+  try {
+    if (canPre){
+      for (let i = 0; i < total; i++){
+        if (FX.cancel) throw new Error('cancel');
+        await prov.seek(i / fps, canvas, bg);
+        pre.push(await createImageBitmap(canvas));
+        fxStatus('预渲染 ' + (i + 1) + ' / ' + total + ' 帧', ((i + 1) / total) * 45);
+        if (i % 2 === 1) await fxYield();
+      }
+    }
+  } catch (err) {
+    pre.forEach(b => { try { b.close(); } catch (e) {} });
+    try { prov.close(); } catch (e) {}
+    throw err;
+  }
+
+  const stream = canvas.captureStream(0);
+  const track = stream.getVideoTracks()[0];
+  const bits = Math.min(24e6, Math.max(2e6, Math.round(W * H * fps * 0.15)));
+  let rec = null;
+  try { rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: bits }); }
+  catch (e) { pre.forEach(b => { try { b.close(); } catch (x) {} }); try { prov.close(); } catch (x) {} throw new Error('录制器创建失败'); }
+
+  const chunks = [];
+  rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+  const stopped = new Promise(res => { rec.onstop = () => res(); });
+  let cancelled = false;
+
+  fxStatus('录制 0 / ' + total + ' 帧…', 45);
+  try {
+    rec.start(200);
+    await new Promise(r => setTimeout(r, 160));
+    const t0 = performance.now(), dt = 1000 / fps;
+    for (let i = 0; i < total; i++){
+      if (FX.cancel){ cancelled = true; break; }
+      if (pre[i]) ctx.drawImage(pre[i], 0, 0);
+      else await prov.seek(i / fps, canvas, bg);
+      if (track.requestFrame) track.requestFrame();
+      const wait = t0 + (i + 1) * dt - performance.now();
+      if (wait > 0) await new Promise(r => setTimeout(r, wait));
+      fxStatus('录制 ' + (i + 1) + ' / ' + total + ' 帧', 45 + ((i + 1) / total) * 50);
+    }
+    if (!cancelled) await new Promise(r => setTimeout(r, dt + 120));
+  } finally {
+    try { if (rec.state !== 'inactive') rec.stop(); } catch (e) {}
+    try { track.stop(); } catch (e) {}
+    try { prov.close(); } catch (e) {}
+    pre.forEach(b => { try { b.close(); } catch (e) {} });
+  }
+
+  await Promise.race([stopped, new Promise(r => setTimeout(r, 2500))]);
+  if (cancelled) throw new Error('cancel');
+
+  const type = mime.split(';')[0];
+  const blob = new Blob(chunks, { type });
+  if (!blob.size) throw new Error('录制结果为空，可改用 GIF 或序列帧');
+  const ext = (type === 'video/mp4') ? '.mp4' : '.webm';
+  const fileName = baseName(prov.name) + '_' + W + 'x' + H + '_' + fps + 'fps' + ext;
+  download(blob, fileName);
+  fxStatus('已导出 ' + ext.slice(1).toUpperCase() + ' · ' + total + ' 帧 · ' + fmtBytes(blob.size), 100);
+  toast('已导出 ' + ext.slice(1).toUpperCase() + '（' + total + ' 帧 · ' + W + '×' + H + ' · ' + fps + 'fps · ' + fmtBytes(blob.size) + '）');
 }
 
 /* ---------- 导出入口 ---------- */
 async function fxRunExport(){
   if (FX.busy) return;
-  if (!fxLottieReady()) { toast('请先载入 Lottie JSON'); return; }
+  const kind = fxKind(), caps = fxCaps(kind);
+  if (!kind) { toast('请先导入文件'); return; }
+  if (!caps[FX.fmt]) { toast('当前源不支持该格式'); return; }
 
   FX.busy = true;
   FX.cancel = false;
@@ -2931,6 +3195,7 @@ async function fxRunExport(){
 
   try {
     if (FX.fmt === 'gif') await fxExportGif();
+    else if (FX.fmt === 'mp4') await fxExportMp4();
     else await fxExportSequence();
   } catch (err) {
     if (String(err && err.message) === 'cancel') { fxStatus('已取消', null); toast('已取消导出'); }
@@ -2975,7 +3240,7 @@ if (fxEl.bg) {
 
 if (fxEl.fps) {
   fxEl.fps.addEventListener('input', () => {
-    const v = Math.max(2, Math.min(50, Number(fxEl.fps.value) || 30));
+    const v = Math.max(2, Math.min(60, Number(fxEl.fps.value) || 30));
     FX.fps = v;
     fxNote();
   });
@@ -3226,7 +3491,6 @@ function loadVideoFile(file){
 
     settled = true;
     V.ready = true;
-    VIDX.fps = Math.max(2, Math.min(30, Math.round(V.fps)));
     if (S.video !== V) return;
 
     el.timeline.min = 0;
@@ -3242,7 +3506,7 @@ function loadVideoFile(file){
     updateZoneStates();
     renderDocbar();
     updateExports();
-    syncVideoExportUI();
+    if (window.__fxSync) window.__fxSync();
     if (S.view === 'video' && S.playing && v.paused) { const p = v.play(); if (p && p.catch) p.catch(() => {}); }
     toast('已识别视频 · ' + V.w + '×' + V.h + ' · ' + (isFinite(V.dur) ? V.dur : 0).toFixed(2) + 's · ' + (V.fpsExact ? V.fps + 'fps' : '≈' + Math.round(V.fps) + 'fps') + (V.codec ? ' · ' + codecName(V.codec) : ''));
   };
@@ -3285,72 +3549,14 @@ function syncVideoBar(){
   el.dimLabel.textContent = Math.round((V.w || 0) * (V.scaleF || 1)) + ' × ' + Math.round((V.h || 0) * (V.scaleF || 1));
 }
 
-/* ---------- 视频导出的面板状态 ---------- */
-const VIDX = { busy: false, cancel: false, fps: 24, loop: 0 };
-
-const vidEl = {
-  fps: document.getElementById('vidFps'),
-  loop: document.getElementById('vidLoop'),
-  note: document.getElementById('vidNote'),
-  prog: document.getElementById('vidProg'),
-  fill: document.getElementById('vidFill'),
-  jpg: document.getElementById('vidJpg'),
-  gif: document.getElementById('vidGif'),
-  cancel: document.getElementById('vidCancel'),
-  stat: document.getElementById('vidStat')
-};
-
+/* 视频导出尺寸：按「尺寸倍率」算，封顶 4096 */
 function videoOutDims(){
-  const V = S.video;
-  if (!V) return { w: 1, h: 1 };
+  const V = S.video || {};
   const f = V.scaleF || 1;
   return {
     w: Math.min(4096, Math.max(1, Math.round((V.w || 1) * f))),
     h: Math.min(4096, Math.max(1, Math.round((V.h || 1) * f)))
   };
-}
-
-function vidStatus(text, pct){
-  if (vidEl.stat) vidEl.stat.textContent = text || '';
-  if (vidEl.prog) vidEl.prog.style.display = (pct === null || pct === undefined) ? 'none' : '';
-  if (vidEl.fill && pct !== null && pct !== undefined) vidEl.fill.style.width = Math.max(0, Math.min(100, pct)) + '%';
-}
-
-/* GIF 帧数：按时长×帧率取样，但不超过容器里真实的帧数（避免尾帧重复） */
-function gifFrameCount(dur, fps){
-  const V = S.video;
-  const n = Math.max(1, Math.min(900, Math.round(dur * fps)));
-  if (V && V.frames > 0) return Math.max(1, Math.min(n, V.frames));
-  return n;
-}
-
-function syncVideoExportUI(){
-  if (!vidEl.fps) return;
-  const V = S.video;
-  const ready = !!(V && V.ready) && S.view === 'video';
-  const size = videoOutDims();
-  const fps = Math.max(2, Math.min(30, Math.round(Number(VIDX.fps) || 24)));
-  const dur = (V && isFinite(V.dur) && V.dur > 0) ? V.dur : 0;
-  const total = dur ? gifFrameCount(dur, fps) : 0;
-  const canGif = ready && dur > 0;
-
-  vidEl.fps.value = fps;
-  vidEl.fps.disabled = !ready || VIDX.busy;
-  if (vidEl.loop){
-    vidEl.loop.querySelectorAll('button').forEach(b => {
-      b.classList.toggle('on', Number(b.dataset.loop) === VIDX.loop);
-      b.disabled = !ready || VIDX.busy;
-    });
-  }
-  if (vidEl.note){
-    if (!ready) vidEl.note.textContent = '载入视频后可导出单帧 JPG 或转成 GIF';
-    else if (!dur) vidEl.note.textContent = '时长未知，暂不能转 GIF；可先导出当前帧 JPG';
-    else vidEl.note.textContent = total + ' 帧 GIF · ' + size.w + '×' + size.h + ' · ' + fps + 'fps · 时长 ' + dur.toFixed(2) + 's' + ((V.fpsExact && fps !== Math.round(V.fps)) ? ' · 原 ' + V.fps + 'fps' : '');
-  }
-  if (vidEl.jpg) vidEl.jpg.disabled = !ready || VIDX.busy;
-  if (vidEl.gif) vidEl.gif.disabled = !canGif || VIDX.busy;
-  if (vidEl.gif) vidEl.gif.textContent = VIDX.busy ? '转换中…' : '转成 GIF';
-  if (vidEl.cancel) vidEl.cancel.style.display = VIDX.busy ? '' : 'none';
 }
 
 /* ---------- 取帧 ---------- */
@@ -3426,127 +3632,14 @@ async function exportVideoJpg(){
   }
 }
 
-/* 视频 → GIF：抽样建全局调色板，再逐帧量化写入 */
-async function videoToGif(){
-  const V = S.video;
-  if (!V || !V.ready || VIDX.busy) return;
-  const fps = Math.max(2, Math.min(30, Math.round(Number(VIDX.fps) || 24)));
-  const dur = (V.dur && isFinite(V.dur)) ? V.dur : 0;
-  if (!dur){ toast('视频时长未知，无法转换为 GIF；可先导出单帧 JPG'); return; }
-
-  const total = gifFrameCount(dur, fps);
-  const size = videoOutDims();
-  if (size.w * size.h > 2500000) toast('尺寸偏大（' + size.w + '×' + size.h + '），GIF 体积会很大，建议先把倍率调小');
-
-  VIDX.busy = true;
-  VIDX.cancel = false;
-  syncVideoExportUI();
-  videoPauseNow();
-  vidStatus('准备解码…', 0);
-
-  let hv = null;
-  try {
-    hv = await openHiddenVideo(V.url);
-    const canvas = fxMakeCanvas(size.w, size.h);
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
-
-    /* 第一遍：抽样统计颜色 */
-    const sampleCount = Math.min(total, 18);
-    const hist = fxHistogram();
-    for (let s = 0; s < sampleCount; s++){
-      if (VIDX.cancel) throw new Error('cancel');
-      const t = sampleCount > 1 ? Math.min(dur - 0.001, (s * dur) / sampleCount) : 0;
-      await vidSeek(hv, t);
-      ctx.drawImage(hv, 0, 0, size.w, size.h);
-      const data = ctx.getImageData(0, 0, size.w, size.h).data;
-      for (let p = 0; p < data.length; p += 16) hist[fxColorKey(data[p], data[p + 1], data[p + 2])]++;
-      vidStatus('分析颜色 ' + (s + 1) + ' / ' + sampleCount, ((s + 1) / sampleCount) * 12);
-      await fxYield();
-    }
-
-    const palette = fxRefinePalette(fxPaletteFromHist(hist, 256), hist, 2);
-    const map = fxBuildMap(hist, palette, 0);
-    const out = new FxBuf();
-    fxWriteGifHeader(out, size.w, size.h, palette, -1, VIDX.loop);
-
-    const indices = new Uint8Array(size.w * size.h);
-    const delayCs = Math.max(2, Math.round(100 / fps));
-
-    /* 第二遍：逐帧取帧 + 量化 + LZW */
-    for (let i = 0; i < total; i++){
-      if (VIDX.cancel) throw new Error('cancel');
-      const t = Math.min(dur - 0.001, i / fps);
-      await vidSeek(hv, t);
-      ctx.drawImage(hv, 0, 0, size.w, size.h);
-      const data = ctx.getImageData(0, 0, size.w, size.h).data;
-
-      let q = 0;
-      for (let p = 0; p < data.length; p += 4){
-        const key = fxColorKey(data[p], data[p + 1], data[p + 2]);
-        let idx = map[key];
-        if (idx < 0){
-          let best = 0, bd = Infinity;
-          for (let k = 0; k < palette.length; k++){
-            const dr = data[p] - palette[k][0], dg = data[p + 1] - palette[k][1], db = data[p + 2] - palette[k][2];
-            const d = dr * dr + dg * dg + db * db;
-            if (d < bd){ bd = d; best = k; }
-          }
-          idx = best;
-          map[key] = idx;
-        }
-        indices[q++] = idx;
-      }
-
-      fxWriteGifFrame(out, indices, size.w, size.h, delayCs, -1);
-      vidStatus('编码 ' + (i + 1) + ' / ' + total + ' 帧 · ' + fmtBytes(out.n), 12 + ((i + 1) / total) * 86);
-      await fxYield();
-    }
-
-    out.byte(0x3B); // trailer
-    const blob = out.blob('image/gif');
-    download(blob, baseName(V.name) + '_' + size.w + 'x' + size.h + '_' + fps + 'fps.gif');
-    vidStatus('已导出 GIF · ' + total + ' 帧 · ' + fmtBytes(blob.size), 100);
-    toast('已转成 GIF（' + total + ' 帧 · ' + fmtBytes(blob.size) + '）');
-  } catch (err) {
-    if (String(err && err.message) === 'cancel'){ vidStatus('已取消', null); toast('已取消转换'); }
-    else { vidStatus('转换失败', null); toast('GIF 转换失败：' + String((err && err.message) || err).slice(0, 60)); }
-  } finally {
-    if (hv){
-      try { hv.pause(); hv.removeAttribute('src'); hv.load(); hv.remove(); } catch (e) {}
-    }
-    VIDX.busy = false;
-    VIDX.cancel = false;
-    syncVideoExportUI();
-  }
-}
-
 /* ---------- 视频绑定 ---------- */
 (function bindVideo(){
   const v = videoNode();
-  if (v){
-    v.addEventListener('timeupdate', () => { if (!S.scrubbing) syncVideoBar(); });
-    v.addEventListener('play', () => { if (S.view === 'video'){ S.playing = true; setPlayIcon(); } });
-    v.addEventListener('pause', () => { if (S.view === 'video'){ S.playing = false; setPlayIcon(); } });
-    v.addEventListener('seeking', () => { if (S.view === 'video' && !S.scrubbing) syncVideoBar(); });
-  }
-  if (vidEl.fps){
-    vidEl.fps.addEventListener('input', () => {
-      VIDX.fps = Math.max(2, Math.min(30, Math.round(Number(vidEl.fps.value) || 24)));
-      syncVideoExportUI();
-    });
-    vidEl.fps.addEventListener('blur', () => { vidEl.fps.value = VIDX.fps; });
-  }
-  if (vidEl.loop){
-    vidEl.loop.addEventListener('click', e => {
-      const b = e.target.closest('button[data-loop]');
-      if (!b || b.disabled) return;
-      VIDX.loop = Number(b.dataset.loop) || 0;
-      syncVideoExportUI();
-    });
-  }
-  if (vidEl.jpg) vidEl.jpg.addEventListener('click', exportVideoJpg);
-  if (vidEl.gif) vidEl.gif.addEventListener('click', videoToGif);
-  if (vidEl.cancel) vidEl.cancel.addEventListener('click', () => { VIDX.cancel = true; vidStatus('正在取消…', null); });
+  if (!v) return;
+  v.addEventListener('timeupdate', () => { if (!S.scrubbing) syncVideoBar(); });
+  v.addEventListener('play', () => { if (S.view === 'video'){ S.playing = true; setPlayIcon(); } });
+  v.addEventListener('pause', () => { if (S.view === 'video'){ S.playing = false; setPlayIcon(); } });
+  v.addEventListener('seeking', () => { if (S.view === 'video' && !S.scrubbing) syncVideoBar(); });
 })();
 
 /* ============================================================
@@ -3757,7 +3850,7 @@ function syncFrameUI(){
   el.single.style.display = S.view ? '' : 'none';
   [el.frameSvg, el.framePng, el.frameJpg].forEach(b => {
     if (!b) return;
-    b.disabled = !ready || FRAME.busy || FX.busy || VIDX.busy;
+    b.disabled = !ready || FRAME.busy || FX.busy;
     b.classList.toggle('busy', FRAME.busy);
   });
 }
