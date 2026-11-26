@@ -410,8 +410,9 @@ body{
         <span>· 鼠标移入舞台会虚线标出画布边界与尺寸；点色块立即弹出系统取色器。</span>
         <span>· 图片以 base64 内嵌进 JSON；引用外部路径的资源会提示。</span>
         <span>· GIF / WEBP 会识别格式、帧数与时长；动图按原尺寸导出保持逐帧。</span>
-        <span>· 视频（MP4 / MOV / WEBM）可播放、拖时间轴；Lottie / 视频 / 动图 都能在「导出」卡里出序列帧、GIF、MP4，Lottie 另有 JSON。</span>
-        <span>· 拖入文件即自动播放；停在某一帧后，用进度条右侧的 SVG / PNG 导出这一张定帧（GIF / WEBP / XML 同样适用）。</span>
+        <span>· 视频（MP4 / MOV / WEBM）可播放、拖时间轴；Lottie / 视频 / 动图 都能在「导出」卡里出序列帧、GIF、WEBP、MP4，Lottie 另有 JSON。</span>
+        <span>· 拖入文件即自动播放；停在某一帧后，用进度条右侧的 SVG / PNG / JPG / WEBP 导出这一张定帧（GIF / WEBP / XML 同样适用）。
+· WEBP 动图导出 24bit + 真 alpha（q .92，视觉近无损）；GIF 切「高保真」会用逐帧独立 256 色 + 抖动，体积明显变大。</span>
         <span>· 全部在本机处理，不上传。</span>
       </div>
     </div>
@@ -447,6 +448,7 @@ body{
         <button type="button" id="btnFrameSvg" title="把当前停留的这一帧导出为 SVG 矢量">SVG</button>
         <button type="button" id="btnFramePng" title="把当前停留的这一帧导出为 PNG 位图">PNG</button>
         <button type="button" id="btnFrameJpg" title="把当前停留的这一帧导出为 JPG 图片（无透明通道）">JPG</button>
+        <button type="button" id="btnFrameWebp" title="把当前停留的这一帧导出为 WEBP 图片（保留透明通道）">WEBP</button>
       </div>
       <span class="stc" id="frameBox" style="display:none">帧 <b id="curFrame">0</b> / <span id="totalFrame">0</span></span>
       <span class="stc" id="fpsBox" style="display:none">· <b id="fpsLabel">0</b> fps</span>
@@ -517,6 +519,7 @@ body{
         <button type="button" data-fmt="json" class="on">JSON</button>
         <button type="button" data-fmt="seq">序列帧</button>
         <button type="button" data-fmt="gif">GIF</button>
+        <button type="button" data-fmt="webp">WEBP</button>
         <button type="button" data-fmt="mp4">MP4</button>
       </div>
 
@@ -540,11 +543,18 @@ body{
         <div class="fx-row" data-only="fps">
           <span class="fx-k">帧率</span>
           <input class="fx-num" id="fxFps" type="number" min="2" max="60" step="1" value="30" aria-label="导出帧率"><em class="fx-unit">fps</em>
-          <span class="fx-k" data-only="gif" style="min-width:0;margin-left:auto;padding-left:6px">循环</span>
-          <div class="fx-seg" id="fxLoop" style="flex:0 0 104px" data-only="gif">
+          <span class="fx-k" data-only="loop" style="min-width:0;margin-left:auto;padding-left:6px">循环</span>
+          <div class="fx-seg" id="fxLoop" style="flex:0 0 104px" data-only="loop">
             <button type="button" data-loop="0" class="on">无限</button>
             <button type="button" data-loop="1">1 次</button>
             <button type="button" data-loop="2">2 次</button>
+          </div>
+        </div>
+        <div class="fx-row" data-only="gif">
+          <span class="fx-k" style="min-width:0">GIF 质量</span>
+          <div class="fx-seg" id="fxHifi">
+            <button type="button" data-hifi="0" class="on">标准</button>
+            <button type="button" data-hifi="1">高保真</button>
           </div>
         </div>
         <div class="fx-note" id="fxNote">—</div>
@@ -685,7 +695,8 @@ const el = {
   single: $('#singleExport'),
   frameSvg: $('#btnFrameSvg'),
   framePng: $('#btnFramePng'),
-  frameJpg: $('#btnFrameJpg')
+  frameJpg: $('#btnFrameJpg'),
+  frameWebp: $('#btnFrameWebp')
 };
 
 const ICON_PLAY = '<path d="M7 4.5 19 12 7 19.5z" fill="currentColor" stroke="none"/>';
@@ -1617,7 +1628,7 @@ function renderSwatches(){
   }
   if (info.kind === 'image' || info.kind === 'video') {
     el.swatches.innerHTML = '<div class="hint">' + (info.kind === 'video'
-      ? '视频是位流，不提供选色编辑；可在下方「导出」卡出序列帧 / GIF / MP4，或存单帧 JPG。'
+      ? '视频是位流，不提供选色编辑；可在下方「导出」卡出序列帧 / GIF / WEBP / MP4，或存单帧 JPG。'
       : '图片为位图，不提供选色编辑；可在 Lottie / XML 视图中改矢量颜色。') + '</div>';
     return;
   }
@@ -2299,11 +2310,11 @@ window.addEventListener('resize', () => {
    多格式导出：序列帧 PNG(ZIP) / GIF / MP4（Lottie 另有 JSON）
    源支持 Lottie / 视频 / GIF·WEBP 动图；尺寸取「尺寸倍率」
    ============================================================ */
-const FX = { fmt: 'json', scale: 1, bg: 'transparent', fps: 30, loop: 0, busy: false, cancel: false, lastKey: '' };
+const FX = { fmt: 'json', scale: 1, bg: 'transparent', fps: 30, loop: 0, hifi: false, busy: false, cancel: false, lastKey: '' };
 
 const fxEl = {
   fmt: $('#fxFmt'), opts: $('#fxOpts'), scale: $('#fxScale'), bg: $('#fxBg'),
-  fps: $('#fxFps'), loop: $('#fxLoop'), note: $('#fxNote'), prog: $('#fxProg'),
+  fps: $('#fxFps'), loop: $('#fxLoop'), hifi: $('#fxHifi'), note: $('#fxNote'), prog: $('#fxProg'),
   jsonNote: $('#exportNote'),
   fill: $('#fxFill'), run: $('#fxRun'), cancel: $('#fxCancel'), stat: $('#fxStat')
 };
@@ -2325,7 +2336,7 @@ function fxKind(){
 function fxCaps(kind){
   const k = kind || fxKind();
   const anim = (k === 'lottie' || k === 'video' || k === 'anim');
-  return { json: k === 'lottie', seq: anim, gif: anim, mp4: anim };
+  return { json: k === 'lottie', seq: anim, gif: anim, webp: anim, mp4: anim };
 }
 
 function fxKeyName(){
@@ -2422,7 +2433,7 @@ function fxNote(){
   if (!kind){ fxEl.note.textContent = '导入 Lottie / 视频 / 动图后，这里可导出序列帧、GIF、MP4'; return; }
   if (!caps[FX.fmt]){
     if (kind === 'xml' || kind === 'image') fxEl.note.textContent = 'SVG / 静态图片不做逐帧导出，请用底部「单帧」条';
-    else if (FX.fmt === 'json') fxEl.note.textContent = 'JSON 只适用于 Lottie 源；视频 / 动图请用序列帧、GIF 或 MP4';
+    else if (FX.fmt === 'json') fxEl.note.textContent = 'JSON 只适用于 Lottie 源；视频 / 动图请用序列帧、GIF、WEBP 或 MP4';
     else fxEl.note.textContent = '当前格式不可用';
     return;
   }
@@ -2433,8 +2444,11 @@ function fxNote(){
   if (!total){ fxEl.note.textContent = '时长未知，暂不能逐帧导出；可先导出单帧 JPG'; return; }
   const durTxt = (total / fps).toFixed(2);
   if (FX.fmt === 'gif'){
-    fxEl.note.textContent = total + ' 帧 · ' + size.w + '×' + size.h + ' · ' + fps + 'fps · 时长 ' + durTxt + 's · 256 色'
+    fxEl.note.textContent = total + ' 帧 · ' + size.w + '×' + size.h + ' · ' + fps + 'fps · 时长 ' + durTxt + 's · '
+      + (FX.hifi ? '高保真：逐帧独立 256 色 + 误差扩散抖动（体积会明显变大）' : '全局 256 色')
       + (fps > 30 ? ' · 帧率偏高，体积会变大' : '');
+  } else if (FX.fmt === 'webp'){
+    fxEl.note.textContent = total + ' 帧 · ' + size.w + '×' + size.h + ' · ' + fps + 'fps · 时长 ' + durTxt + 's · 24bit + 真 alpha · 近无损（q .92）';
   } else if (FX.fmt === 'mp4'){
     fxEl.note.textContent = total + ' 帧 · ' + size.w + '×' + size.h + ' · ' + fps + 'fps · 时长 ' + durTxt + 's · ' + fxCodecLabel() + ' · 实时录制，约需 ' + durTxt + 's';
   } else {
@@ -2461,7 +2475,7 @@ function syncFrameExportUI(){
   }
 
   if (!caps[FX.fmt]){
-    const order = ['json', 'seq', 'gif', 'mp4'];
+    const order = ['json', 'seq', 'gif', 'webp', 'mp4'];
     FX.fmt = order.filter(k => caps[k])[0] || 'json';
   }
 
@@ -2475,6 +2489,7 @@ function syncFrameExportUI(){
   if (fxEl.opts) fxEl.opts.style.display = (kind && !isJson) ? '' : 'none';
   fxShowRow('lottie', kind === 'lottie');
   fxShowRow('fps', FX.fmt !== 'json' && (FX.fmt !== 'seq' || kind !== 'lottie'));
+  fxShowRow('loop', FX.fmt === 'gif' || FX.fmt === 'webp');
   fxShowRow('gif', FX.fmt === 'gif');
 
   if (el.btnExport2) el.btnExport2.style.display = (isJson && caps.json) ? '' : 'none';
@@ -2489,6 +2504,10 @@ function syncFrameExportUI(){
     b.classList.toggle('on', Number(b.dataset.loop) === FX.loop);
     b.disabled = !kind || FX.busy;
   });
+  if (fxEl.hifi) fxEl.hifi.querySelectorAll('button').forEach(b => {
+    b.classList.toggle('on', (b.dataset.hifi === '1') === !!FX.hifi);
+    b.disabled = !kind || FX.busy || FX.fmt !== 'gif';
+  });
   if (fxEl.scale) fxEl.scale.querySelectorAll('button').forEach(b => {
     b.classList.toggle('on', Number(b.dataset.s) === FX.scale);
     b.disabled = kind !== 'lottie' || FX.busy;
@@ -2499,7 +2518,8 @@ function syncFrameExportUI(){
   });
 
   if (fxEl.run){
-    fxEl.run.textContent = FX.fmt === 'gif' ? '导出 GIF' : (FX.fmt === 'mp4' ? '导出 MP4' : '导出序列帧');
+    fxEl.run.textContent = FX.fmt === 'gif' ? '导出 GIF'
+      : (FX.fmt === 'webp' ? '导出 WebP' : (FX.fmt === 'mp4' ? '导出 MP4' : '导出序列帧'));
     fxEl.run.disabled = !kind || !caps[FX.fmt] || FX.busy;
   }
   if (fxEl.cancel) fxEl.cancel.style.display = FX.busy ? '' : 'none';
@@ -2743,6 +2763,98 @@ function fxBuildMap(hist, palette, offset){
   }
   return map;
 }
+/* ---------- 高保真 GIF：逐帧局部调色板 + Floyd–Steinberg 抖动 ---------- */
+function fxExactBins(data, transparent){
+  const map = new Map();
+  for (let p = 0; p < data.length; p += 4){
+    if (transparent && data[p + 3] < 128) continue;
+    const key = (data[p] << 16) | (data[p + 1] << 8) | data[p + 2];
+    map.set(key, (map.get(key) || 0) + 1);
+  }
+  const bins = [];
+  map.forEach((c, key) => bins.push({ r: (key >> 16) & 255, g: (key >> 8) & 255, b: key & 255, c }));
+  return bins;
+}
+
+function fxRefineBins(palette, bins, iterations){
+  let pal = palette.map(c => [c[0], c[1], c[2]]);
+  for (let it = 0; it < (iterations || 2); it++){
+    const n = pal.length;
+    const sr = new Float64Array(n), sg = new Float64Array(n), sb = new Float64Array(n), sc = new Float64Array(n);
+    for (const bin of bins){
+      let best = 0, bd = Infinity;
+      for (let i = 0; i < n; i++){
+        const dr = bin.r - pal[i][0], dg = bin.g - pal[i][1], db = bin.b - pal[i][2];
+        const d = dr * dr + dg * dg + db * db;
+        if (d < bd) { bd = d; best = i; }
+      }
+      sr[best] += bin.r * bin.c; sg[best] += bin.g * bin.c;
+      sb[best] += bin.b * bin.c; sc[best] += bin.c;
+    }
+    for (let i = 0; i < n; i++){
+      if (!sc[i]) continue;
+      pal[i] = [Math.round(sr[i] / sc[i]), Math.round(sg[i] / sc[i]), Math.round(sb[i] / sc[i])];
+    }
+  }
+  return pal;
+}
+
+function fxPaletteExact(data, transparent, maxColors){
+  const bins = fxExactBins(data, transparent);
+  if (!bins.length) return [[0, 0, 0]];
+  return fxRefineBins(fxMedianCut(bins, Math.max(2, maxColors)), bins, 2);
+}
+
+/* 逐像素量化 + 误差扩散；table 含透明占位（索引 0）时 start 从 1 起 */
+function fxQuantizeFrame(data, w, h, table, transparent, transIndex){
+  const idx = new Uint8Array(w * h);
+  const start = transparent ? 1 : 0;
+  const cache = new Map();
+  const nearest = (r, g, b) => {
+    const key = (r << 16) | (g << 8) | b;
+    const hit = cache.get(key);
+    if (hit !== undefined) return hit;
+    let best = start, bd = Infinity;
+    for (let i = start; i < table.length; i++){
+      const dr = r - table[i][0], dg = g - table[i][1], db = b - table[i][2];
+      const d = dr * dr + dg * dg + db * db;
+      if (d < bd) { bd = d; best = i; }
+    }
+    cache.set(key, best);
+    return best;
+  };
+  const rows = [new Float32Array((w + 2) * 3), new Float32Array((w + 2) * 3)];
+  let cur = 0;
+  for (let y = 0; y < h; y++){
+    const row = rows[cur], nxt = rows[cur ^ 1];
+    nxt.fill(0);
+    for (let x = 0; x < w; x++){
+      const p = (y * w + x) * 4, q = y * w + x;
+      if (transparent && data[p + 3] < 128) { idx[q] = transIndex; continue; }
+      let r = data[p] + row[(x + 1) * 3], g = data[p + 1] + row[(x + 1) * 3 + 1], b = data[p + 2] + row[(x + 1) * 3 + 2];
+      r = Math.max(0, Math.min(255, Math.round(r)));
+      g = Math.max(0, Math.min(255, Math.round(g)));
+      b = Math.max(0, Math.min(255, Math.round(b)));
+      const ci = nearest(r, g, b);
+      idx[q] = ci;
+      const c = table[ci];
+      const er = r - c[0], eg = g - c[1], eb = b - c[2];
+      if (x + 1 < w){
+        row[(x + 2) * 3] += er * 0.4375; row[(x + 2) * 3 + 1] += eg * 0.4375; row[(x + 2) * 3 + 2] += eb * 0.4375;
+      }
+      if (x > 0){
+        nxt[x * 3] += er * 0.1875; nxt[x * 3 + 1] += eg * 0.1875; nxt[x * 3 + 2] += eb * 0.1875;
+      }
+      nxt[(x + 1) * 3] += er * 0.3125; nxt[(x + 1) * 3 + 1] += eg * 0.3125; nxt[(x + 1) * 3 + 2] += eb * 0.3125;
+      if (x + 1 < w){
+        nxt[(x + 2) * 3] += er * 0.0625; nxt[(x + 2) * 3 + 1] += eg * 0.0625; nxt[(x + 2) * 3 + 2] += eb * 0.0625;
+      }
+    }
+    cur ^= 1;
+  }
+  return idx;
+}
+
 /* ---------- GIF 文件结构 ---------- */
 /* 文件头 + 全局色表（补足 256 项）+ 循环扩展；loopCount 0 = 无限 */
 function fxWriteGifHeader(buf, w, h, palette, transIndex, loopCount){
@@ -2779,6 +2891,89 @@ function fxWriteGifFrame(buf, indices, w, h, delayCs, transIndex){
     buf.bytes(data.subarray(i, i + n));
   }
   buf.byte(0);
+}
+
+
+/* 高保真帧：图像描述符带 256 项局部色表 */
+function fxWriteGifFrameLocal(buf, indices, w, h, delayCs, table, transIndex){
+  buf.byte(0x21); buf.byte(0xF9); buf.byte(0x04);
+  const packed = transIndex >= 0 ? (2 << 2) | 1 : (1 << 2);
+  buf.byte(packed);
+  buf.u16(Math.max(1, delayCs));
+  buf.byte(transIndex >= 0 ? transIndex : 0);
+  buf.byte(0);
+  buf.byte(0x2C);
+  buf.u16(0); buf.u16(0); buf.u16(w); buf.u16(h);
+  buf.byte(0x80 | 7);
+  for (let i = 0; i < 256; i++){
+    const c = table[i] || [0, 0, 0];
+    buf.byte(c[0]); buf.byte(c[1]); buf.byte(c[2]);
+  }
+  buf.byte(8);
+  const data = fxLzw(indices, 8);
+  for (let i = 0; i < data.length; i += 255){
+    const n = Math.min(255, data.length - i);
+    buf.byte(n);
+    buf.bytes(data.subarray(i, i + n));
+  }
+  buf.byte(0);
+}
+
+
+/* ---------- 动图 WEBP 容器（RIFF / VP8X / ANIM / ANMF） ---------- */
+function fxWpChunks(bytes){
+  const out = [];
+  if (!bytes || bytes.length < 12) return out;
+  if (String.fromCharCode(bytes[0], bytes[1], bytes[2], bytes[3]) !== 'RIFF') return out;
+  if (String.fromCharCode(bytes[8], bytes[9], bytes[10], bytes[11]) !== 'WEBP') return out;
+  const n = bytes.length;
+  let q = 12;
+  while (q + 8 <= n){
+    const id = String.fromCharCode(bytes[q], bytes[q + 1], bytes[q + 2], bytes[q + 3]);
+    const size = (bytes[q + 4] | (bytes[q + 5] << 8) | (bytes[q + 6] << 16) | (bytes[q + 7] << 24)) >>> 0;
+    out.push({ id, data: bytes.subarray(q + 8, Math.min(n, q + 8 + size)) });
+    q += 8 + size + (size & 1);
+  }
+  return out;
+}
+
+/* frames: [{ chunks:[{id,data}], ms }]；loopCount 0 = 无限 */
+function fxWriteAnimatedWebp(frames, w, h, loopCount){
+  const body = new FxBuf();
+  body.str('WEBP');
+
+  let hasAlpha = false;
+  frames.forEach(f => { if (f.chunks.some(c => c.id === 'ALPH')) hasAlpha = true; });
+
+  const vp8x = new Uint8Array(10);
+  vp8x[0] = 0x02 | (hasAlpha ? 0x10 : 0);          // Animation | Alpha
+  vp8x[4] = (w - 1) & 255; vp8x[5] = ((w - 1) >> 8) & 255; vp8x[6] = ((w - 1) >> 16) & 255;
+  vp8x[7] = (h - 1) & 255; vp8x[8] = ((h - 1) >> 8) & 255; vp8x[9] = ((h - 1) >> 16) & 255;
+  body.str('VP8X'); body.u32(10); body.bytes(vp8x);
+
+  const anim = new Uint8Array(6);
+  const lp = Math.min(65535, Math.max(0, loopCount || 0));
+  anim[4] = lp & 255; anim[5] = (lp >> 8) & 255;
+  body.str('ANIM'); body.u32(6); body.bytes(anim);
+
+  frames.forEach(f => {
+    const inner = new FxBuf();
+    f.chunks.forEach(c => {
+      inner.str(c.id); inner.u32(c.data.length); inner.bytes(c.data);
+      if (c.data.length & 1) inner.byte(0);
+    });
+    const head = new Uint8Array(16);
+    head[6] = (w - 1) & 255; head[7] = ((w - 1) >> 8) & 255; head[8] = ((w - 1) >> 16) & 255;
+    head[9] = (h - 1) & 255; head[10] = ((h - 1) >> 8) & 255; head[11] = ((h - 1) >> 16) & 255;
+    const ms = Math.max(1, Math.round(f.ms));
+    head[12] = ms & 255; head[13] = (ms >> 8) & 255; head[14] = (ms >> 16) & 255;
+    head[15] = 0x02;                                  // 不做 Alpha 混合：整帧替换
+    body.str('ANMF'); body.u32(16 + inner.n); body.bytes(head); body.bytes(inner.data());
+  });
+
+  const out = new FxBuf();
+  out.str('RIFF'); out.u32(body.n); out.bytes(body.data());
+  return out.data();
 }
 
 /* ============================================================
@@ -3028,7 +3223,7 @@ async function fxExportGif(){
   const canvas = fxMakeCanvas(prov.w, prov.h);
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
-  fxStatus('分析颜色…', 0);
+  fxStatus(FX.hifi ? '准备高保真编码…' : '分析颜色…', 0);
   try {
     /* 第一遍：抽样帧统计颜色，建立全局调色板 */
     const sampleCount = Math.min(total, 16);
@@ -3059,48 +3254,95 @@ async function fxExportGif(){
     const gifPalette = hasAlpha ? [[0, 0, 0]].concat(palette) : palette;
     fxWriteGifHeader(out, prov.w, prov.h, gifPalette, transIndex, FX.loop);
 
+    const hifi = !!FX.hifi;
     const indices = new Uint8Array(prov.w * prov.h);
+
     for (let i = 0; i < total; i++){
       if (FX.cancel) throw new Error('cancel');
       await prov.seek(i / fps, canvas, FX.bg);
       const data = ctx.getImageData(0, 0, prov.w, prov.h).data;
+      const cs = Math.round(((i + 1) * 100) / fps) - Math.round((i * 100) / fps);
 
-      let q = 0;
-      for (let p = 0; p < data.length; p += 4){
-        if (data[p + 3] < 128){
-          indices[q++] = hasAlpha ? transIndex : 0;
-          continue;
-        }
-        const key = fxColorKey(data[p], data[p + 1], data[p + 2]);
-        let idx = map[key];
-        if (idx < 0){
-          let best = 0, bd = Infinity;
-          for (let k = 0; k < palette.length; k++){
-            const dr = data[p] - palette[k][0], dg = data[p + 1] - palette[k][1], db = data[p + 2] - palette[k][2];
-            const d = dr * dr + dg * dg + db * db;
-            if (d < bd) { bd = d; best = k; }
+      if (hifi){
+        /* 高保真：本帧精确直方图 → 独立 256 色调色板 → 误差扩散量化 → 局部色表 */
+        const local = fxPaletteExact(data, hasAlpha, hasAlpha ? 255 : 256);
+        const table = hasAlpha ? [[0, 0, 0]].concat(local) : local;
+        const frameIdx = fxQuantizeFrame(data, prov.w, prov.h, table, hasAlpha, hasAlpha ? 0 : -1);
+        fxWriteGifFrameLocal(out, frameIdx, prov.w, prov.h, Math.max(2, cs), table, hasAlpha ? 0 : -1);
+      } else {
+        let q = 0;
+        for (let p = 0; p < data.length; p += 4){
+          if (data[p + 3] < 128){
+            indices[q++] = hasAlpha ? transIndex : 0;
+            continue;
           }
-          idx = best + offset;
-          map[key] = idx;
+          const key = fxColorKey(data[p], data[p + 1], data[p + 2]);
+          let idx = map[key];
+          if (idx < 0){
+            let best = 0, bd = Infinity;
+            for (let k = 0; k < palette.length; k++){
+              const dr = data[p] - palette[k][0], dg = data[p + 1] - palette[k][1], db = data[p + 2] - palette[k][2];
+              const d = dr * dr + dg * dg + db * db;
+              if (d < bd) { bd = d; best = k; }
+            }
+            idx = best + offset;
+            map[key] = idx;
+          }
+          indices[q++] = idx;
         }
-        indices[q++] = idx;
+        fxWriteGifFrame(out, indices, prov.w, prov.h, Math.max(2, cs), transIndex);
       }
 
-      const cs = Math.round(((i + 1) * 100) / fps) - Math.round((i * 100) / fps);
-      fxWriteGifFrame(out, indices, prov.w, prov.h, Math.max(2, cs), transIndex);
-      fxStatus('编码 ' + (i + 1) + ' / ' + total + ' 帧 · ' + fmtBytes(out.n), 12 + ((i + 1) / total) * 86);
+      fxStatus((hifi ? '高保真编码 ' : '编码 ') + (i + 1) + ' / ' + total + ' 帧 · ' + fmtBytes(out.n), 12 + ((i + 1) / total) * 86);
       await fxYield();
     }
 
     out.byte(0x3B); // trailer
     const blob = out.blob('image/gif');
-    const fileName = baseName(prov.name) + '_' + prov.w + 'x' + prov.h + '_' + fps + 'fps.gif';
+    const fileName = baseName(prov.name) + '_' + prov.w + 'x' + prov.h + '_' + fps + 'fps' + (hifi ? '_hifi' : '') + '.gif';
     download(blob, fileName);
     fxStatus('已导出 GIF · ' + total + ' 帧 · ' + fmtBytes(blob.size), 100);
-    toast('已导出 GIF（' + total + ' 帧 · ' + fmtBytes(blob.size) + '）');
+    toast('已导出 GIF' + (hifi ? '（高保真）' : '') + '：' + total + ' 帧 · ' + fmtBytes(blob.size));
   } finally {
     try { prov.close(); } catch (e) {}
   }
+}
+
+
+/* ---------- 动图 WEBP 导出（24bit + 真 alpha，视觉近无损） ---------- */
+async function fxExportWebp(){
+  const prov = await fxOpenSource();
+  const fps = Math.max(2, Math.min(60, Math.round(Number(FX.fps) || prov.fps || 24)));
+  const total = Math.max(1, Math.min(900, prov.kind === 'lottie' ? prov.total : Math.round(prov.dur * fps)));
+  const canvas = fxMakeCanvas(prov.w, prov.h);
+  const frames = [];
+
+  fxStatus('编码 WebP…', 0);
+  try {
+    for (let i = 0; i < total; i++){
+      if (FX.cancel) throw new Error('cancel');
+      await prov.seek(i / fps, canvas, FX.bg);
+      const blob = await fxCanvasBlob(canvas, 'image/webp', 0.92);
+      if (!blob || !blob.size) throw new Error('WebP 编码失败（当前浏览器不支持）');
+      const bytes = new Uint8Array(await blob.arrayBuffer());
+      const chunks = fxWpChunks(bytes).filter(c => c.id === 'ALPH' || c.id === 'VP8 ' || c.id === 'VP8L');
+      if (!chunks.length) throw new Error('WebP 编码失败');
+      const ms = Math.max(1, Math.round(((i + 1) * 1000) / fps) - Math.round((i * 1000) / fps));
+      frames.push({ chunks, ms });
+      fxStatus('编码 ' + (i + 1) + ' / ' + total + ' 帧', ((i + 1) / total) * 94);
+      await fxYield();
+    }
+  } finally {
+    try { prov.close(); } catch (e) {}
+  }
+
+  fxStatus('封装动图容器…', 96);
+  const data = fxWriteAnimatedWebp(frames, prov.w, prov.h, FX.loop);
+  const blob = new Blob([data], { type: 'image/webp' });
+  const fileName = baseName(prov.name) + '_' + prov.w + 'x' + prov.h + '_' + fps + 'fps.webp';
+  download(blob, fileName);
+  fxStatus('已导出 WEBP · ' + total + ' 帧 · ' + fmtBytes(blob.size), 100);
+  toast('已导出 WEBP（' + total + ' 帧 · ' + prov.w + '×' + prov.h + ' · ' + fmtBytes(blob.size) + '）');
 }
 
 /* ---------- MP4 导出（canvas + MediaRecorder；无 MP4 编码时回落 WebM） ---------- */
@@ -3110,7 +3352,8 @@ async function fxExportMp4(){
   if (!mime) throw new Error('当前浏览器不支持视频录制');
   const fps = Math.max(2, Math.min(60, Math.round(prov.fps)));
   const total = Math.max(1, Math.min(900, prov.kind === 'lottie' ? prov.total : Math.round(prov.dur * fps)));
-  const W = fxEven(prov.w), H = fxEven(prov.h);
+  /* H.264 编码器要求宽高为偶数且不小于 16，过小的导出尺寸会被补到 16 */
+  const W = Math.max(16, fxEven(prov.w)), H = Math.max(16, fxEven(prov.h));
   const canvas = fxMakeCanvas(W, H);
   const ctx = canvas.getContext('2d');
   const bg = prov.kind === 'lottie' ? FX.bg : 'dark';
@@ -3195,6 +3438,7 @@ async function fxRunExport(){
 
   try {
     if (FX.fmt === 'gif') await fxExportGif();
+    else if (FX.fmt === 'webp') await fxExportWebp();
     else if (FX.fmt === 'mp4') await fxExportMp4();
     else await fxExportSequence();
   } catch (err) {
@@ -3257,6 +3501,15 @@ if (fxEl.loop) {
   });
 }
 
+if (fxEl.hifi) {
+  fxEl.hifi.addEventListener('click', e => {
+    const b = e.target.closest('button[data-hifi]');
+    if (!b || b.disabled) return;
+    FX.hifi = b.dataset.hifi === '1';
+    syncFrameExportUI();
+  });
+}
+
 if (fxEl.run) fxEl.run.addEventListener('click', fxRunExport);
 if (fxEl.cancel) fxEl.cancel.addEventListener('click', () => { FX.cancel = true; fxStatus('正在取消…', null); });
 
@@ -3305,12 +3558,14 @@ function jpegCanvas(src){
 }
 
 async function saveRaster(cv, kind, filePrefix, label){
-  const isJpg = kind === 'jpg';
+  const isJpg = kind === 'jpg', isWebp = kind === 'webp';
   const target = isJpg ? jpegCanvas(cv) : cv;
-  const blob = await fxCanvasBlob(target, isJpg ? 'image/jpeg' : 'image/png', isJpg ? 0.92 : undefined);
-  if (!blob) throw new Error((isJpg ? 'JPG' : 'PNG') + ' 编码失败');
-  download(blob, filePrefix + (isJpg ? '.jpg' : '.png'));
-  toast('已导出 ' + label + '（' + target.width + '×' + target.height + '）');
+  const blob = await fxCanvasBlob(target,
+    isWebp ? 'image/webp' : (isJpg ? 'image/jpeg' : 'image/png'),
+    isWebp ? 0.95 : (isJpg ? 0.92 : undefined));
+  if (!blob) throw new Error((isWebp ? 'WEBP' : (isJpg ? 'JPG' : 'PNG')) + ' 编码失败');
+  download(blob, filePrefix + (isJpg ? '.jpg' : (isWebp ? '.webp' : '.png')));
+  toast('已导出 ' + label + '（' + target.width + '×' + target.height + (isWebp ? ' · 保留透明通道' : '') + '）');
 }
 
 /* MP4 / MOV 容器解析：取视频轨帧数、时长、真实帧率与编码名 */
@@ -3792,7 +4047,7 @@ async function exportFrame(kind){
 
   const [w, h] = frameDims();
   const name = frameBaseName();
-  const tag = kind === 'jpg' ? 'JPG' : 'PNG';
+  const tag = kind === 'jpg' ? 'JPG' : (kind === 'webp' ? 'WEBP' : 'PNG');
 
   try {
     if (S.view === 'lottie') {
@@ -3848,7 +4103,7 @@ function syncFrameUI(){
   if (!el.single) return;
   const ready = frameViewReady();
   el.single.style.display = S.view ? '' : 'none';
-  [el.frameSvg, el.framePng, el.frameJpg].forEach(b => {
+  [el.frameSvg, el.framePng, el.frameJpg, el.frameWebp].forEach(b => {
     if (!b) return;
     b.disabled = !ready || FRAME.busy || FX.busy;
     b.classList.toggle('busy', FRAME.busy);
@@ -3858,6 +4113,7 @@ function syncFrameUI(){
 if (el.frameSvg) el.frameSvg.addEventListener('click', () => exportFrame('svg'));
 if (el.framePng) el.framePng.addEventListener('click', () => exportFrame('png'));
 if (el.frameJpg) el.frameJpg.addEventListener('click', () => exportFrame('jpg'));
+if (el.frameWebp) el.frameWebp.addEventListener('click', () => exportFrame('webp'));
 window.__frameSync = syncFrameUI;
 syncFrameUI();
 
